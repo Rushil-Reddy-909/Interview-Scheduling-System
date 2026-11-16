@@ -21,10 +21,18 @@ Automatic candidate-to-interviewer matching is a later feature. For now a recrui
 
 ## Login
 
-- Every user has a regular login form (email and password).
-- There is no signup.
+Spring Security form login with an HTTP session. There is no HTTP Basic auth and no JWT.
+
+- The login page posts email and password. There is no signup.
 - Only an admin creates or changes users.
 - On an empty database, startup creates one admin from local config (`app.admin.email`, `app.admin.password`), so the first login is possible.
+- Spring Security checks the BCrypt hash once, at login, and stores an `Authentication` in the HTTP session. That object carries the email and the role (`ADMIN`, `RECRUITER`, `CANDIDATE`, or `INTERVIEWER`).
+- Later requests restore that `Authentication` from the session cookie. They do not load the user again.
+- Pages and actions are allowed or refused from that role.
+- A role or password change applies on the user's next login. The current session keeps the previous role until then.
+- Logout ends the session.
+
+`spring-security-crypto` is already a dependency, for the password hash. The login build still has to add `spring-boot-starter-security` and the form-login configuration. None of that is implemented yet.
 
 ## Scheduling rules
 
@@ -74,7 +82,7 @@ Table details are in `docs/schema.md`.
 
 Built later, in this order of need:
 
-- **Login**: one form for all roles.
+- **Login**: one Spring Security form for all roles, backed by a session.
 - **Recruiter scheduling**: pick candidate and interviewer, then a weekday calendar, then a date with its common free gaps, then a create form with start and duration. Replacements use the same screens.
 - **Candidate dashboard**: upcoming interviews, accept, or request a new start.
 - **Interviewer calendar**: read-only view. Each cell shows "has an interview" or "free" (no interview in that range). Interviewers do not enter availability yet.
@@ -93,4 +101,4 @@ Thymeleaf renders the screens. Spring Validation checks forms on the server.
 
 ## Open decisions
 
-None blocking. The decisions above come from the design discussion (prompts 004, 005, and 011 to 013).
+None blocking. The decisions above come from the design discussion (prompts 004, 005, 011 to 013, and 017).
