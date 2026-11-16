@@ -1,65 +1,86 @@
 # Schema
 
-Status: proposed only. There are no JPA entities and no tables yet. Local H2 is configured so the application can start; Hibernate is not mapping a domain model.
+Status: designed, not yet mapped. There are no JPA entities or tables in code yet. Hibernate uses `ddl-auto=update` against the local H2 file database (`./data/interview-scheduling`), so tables will appear once entities exist.
 
-People are one row per role for now. The same human who both recruits and interviews would be two rows until the open question in `docs/design.md` is decided.
+Names are snake_case. `user` is reserved in H2, so the people table is `app_user`.
 
-## person
+## app_user
 
-| Column | Notes |
-| --- | --- |
-| id | Primary key |
-| full_name | Required |
-| email | Required, unique |
-| role | `RECRUITER`, `CANDIDATE`, or `INTERVIEWER` |
-| created_at | Set when the row is created |
+| Column | Type | Notes |
+| --- | --- | --- |
+| id | bigint, PK | Generated |
+| name | varchar, required | Display name |
+| email | varchar, required, unique | Login identifier |
+| password_hash | varchar, required | BCrypt hash. Never store plain text |
+| role | varchar, required | `ADMIN`, `RECRUITER`, `CANDIDATE`, or `INTERVIEWER`. One role per user |
+| created_at | timestamp (UTC), required | Set on insert |
+
+Only an admin creates or updates rows here.
 
 ## interview
 
-| Column | Notes |
-| --- | --- |
-| id | Primary key |
-| recruiter_id | References `person`. That person must have role `RECRUITER` |
-| candidate_id | References `person`. That person must have role `CANDIDATE` |
-| duration_minutes | Length of each proposed slot |
-| timezone | Timezone the window and working hours are interpreted in |
-| window_start | First date to search, inclusive |
-| window_end | Last date to search, inclusive |
-| status | See below |
-| created_at | Set when the row is created |
+| Column | Type | Notes |
+| --- | --- | --- |
+| id | bigint, PK | Generated |
+| recruiter_id | bigint, FK to `app_user.id`, required | Must have role `RECRUITER`. Set once, when the interview is created |
+| candidate_id | bigint, FK to `app_user.id`, required | Must have role `CANDIDATE` |
+| interviewer_id | bigint, FK to `app_user.id`, required | Must have role `INTERVIEWER` |
+| duration_minutes | integer, required | Set by the recruiter. Does not change during a reschedule |
+| starts_at | timestamp (UTC), required | Official slot start |
+| ends_at | timestamp (UTC), required | Always `starts_at + duration_minutes`. Written only by the service |
+| requested_starts_at | timestamp (UTC), nullable | Set only while a reschedule request is open. Holds the candidate's suggested start |
+| status | varchar, required | `AWAITING_CANDIDATE`, `ACCEPTED`, or `RESCHEDULE_REQUESTED` |
+| created_at | timestamp (UTC), required | Set on insert |
+| updated_at | timestamp (UTC), required | Set on every change |
 
-Status values: `PROPOSED`, `CONFIRMED`, `RESCHEDULE_REQUESTED`, `CANCELLED`.
+Role checks are enforced in the service layer. The database does not check them.
 
-## interview_interviewer
+### Status transitions
 
-| Column | Notes |
-| --- | --- |
-| interview_id | References `interview`. Part of the primary key |
-| interviewer_id | References `person` with role `INTERVIEWER`. Part of the primary key |
+```mermaid
+stateDiagram-v2
+  [*] --> AwaitingCandidate: recruiter creates interview
+  AwaitingCandidate --> Accepted: candidate accepts
+  AwaitingCandidate --> RescheduleRequested: candidate requests new start
+  Accepted --> RescheduleRequested: candidate requests new start
+  RescheduleRequested --> AwaitingCandidate: recruiter sets replacement slot
+```
 
-An interview has at least one interviewer.
+When a replacement is set, `starts_at` and `ends_at` change, `requested_starts_at` becomes null, and `status` becomes `AWAITING_CANDIDATE`.
 
-## proposed_slot
+### Slot rules
 
-| Column | Notes |
-| --- | --- |
-| id | Primary key |
-| interview_id | References `interview` |
-| starts_at | Slot start, stored as an instant |
-| ends_at | Slot end. `ends_at - starts_at` equals the interview duration |
-| status | `PROPOSED`, `CONFIRMED`, or `WITHDRAWN` |
+Enforced by the service on create, on a candidate's requested start, and on a recruiter's replacement slot:
 
-At most one slot on an interview may be `CONFIRMED`. Confirming a slot withdraws the other `PROPOSED` slots on that interview.
+- `ends_at = starts_at + duration_minutes`.
+- `starts_at` and `ends_at` fall on the same UTC date, which is Monday through Friday.
+- `starts_at >= 09:00 UTC` and `ends_at <= 17:00 UTC`.
+- Intervals are half-open, `[starts_at, ends_at)`. A slot may start at the moment another ends.
 
-## reschedule_request
+Overlap check for a new official slot (create or replacement). Two interviews overlap when `existing.starts_at < new.ends_at AND new.starts_at < existing.ends_at`. Check against other interviews where:
 
-| Column | Notes |
-| --- | --- |
-| id | Primary key |
-| interview_id | References `interview` |
-| message | The candidate's reason or note. Required |
-| preferred_window_start | Optional date |
-| preferred_window_end | Optional date. Required when `preferred_window_start` is set, and not before it |
-| created_at | Set when the row is created |
+- `interviewer_id` matches, or `candidate_id` matches, and
+- `status` is `AWAITING_CANDIDATE`, `ACCEPTED`, or `RESCHEDULE_REQUESTED`, and
+- the row is not the one being changed.
 
-Creating a request sets the interview status to `RESCHEDULE_REQUESTED`. It does not delete the current proposals.
+While status is `RESCHEDULE_REQUESTED`, the official `[starts_at, ends_at)` stays occupied. It changes only when the recruiter saves a new start, which also rewrites `ends_at`. The candidate's requested start is checked against the weekday and time rules only. It is not checked for overlap and does not reserve a second range.
+
+The service runs this check and the write in one transaction, after locking the candidate and interviewer `app_user` rows. Two requests can otherwise both see a free slot and both commit. A unique index cannot express "these ranges must not overlap." H2 has no exclusion constraints, so the database cannot enforce the range rule on its own. A later move to PostgreSQL could add a GiST exclusion constraint on `(interviewer_id, [starts_at, ends_at))` and the same for `candidate_id`.
+
+### Indexes
+
+These speed up reads. They do not enforce uniqueness or non-overlap.
+
+- `(interviewer_id, starts_at)` — interviewer calendar, and the overlap query's `starts_at < new end` range for one interviewer
+- `(candidate_id, starts_at)` — candidate dashboard, and the same range for one candidate
+- `(status)` — admin listing and filters, if needed later
+
+A dashboard query is `person_id = ? AND starts_at >= ? ORDER BY starts_at`. The index finds that person, then walks start times in order. The overlap query uses the same index to ignore rows that start at or after the new slot's end, then checks `ends_at` on what remains.
+
+## Not in the schema yet
+
+- Cancellation. There is no `CANCELLED` status yet.
+- Availability for interviewers.
+- More than one interviewer per interview. That would need a join table.
+- Per-user timezone.
+- Audit history of reschedule requests. Only the current open request is stored.
