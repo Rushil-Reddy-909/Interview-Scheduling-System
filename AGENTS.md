@@ -22,3 +22,8 @@ Add a new Markdown file in `docs/prompts/` before you finish the task.
 Do this before the turn ends, including in plan mode and Ask mode. Do not wait until a plan is executed. If Ask mode blocks writing files, log that prompt on the next turn that can write.
 
 Do not skip a prompt because it was only a question or a planning message.
+
+Exceptions:
+
+- Do not log a prompt that only asks to add, commit, or push changes.
+- Do not log a prompt the user explicitly asks not to log.

@@ -1,10 +1,10 @@
 # Design
 
-Status: the `app_user` and `interview` tables are mapped, and startup seeds one admin when none exists. The calendar scheduling flow below is designed but not implemented. Login and screens are not built yet.
+Status: the `app_user` and `interview` tables are mapped, and startup seeds one admin when none exists. The matching flow below is designed but not implemented. Login and screens are not built yet.
 
 ## Product
 
-A recruiter picks one candidate and one interviewer. A calendar of weekdays appears. Clicking a date shows the times when both people are free. The recruiter picks a start time and a duration that fit inside one of those free times, and creates the interview. The candidate then accepts the slot or asks to reschedule by picking a different start. The recruiter picks a replacement slot from the same calendar, and the candidate must accept it.
+A recruiter picks one or more candidates, a pool of interviewers, a duration, and a date range. The system proposes an interviewer and a start for each candidate. The recruiter reviews the proposal and confirms it, which creates the interviews. A candidate then accepts the slot or asks to reschedule by picking a different start. The recruiter runs the same matching for the reschedule request, confirms a replacement, and the candidate must accept it.
 
 This is an internal tool. There is no public signup.
 
@@ -13,11 +13,11 @@ This is an internal tool. There is no public signup.
 All people are rows in one `app_user` table. Each user has one role:
 
 - **Admin** creates and edits users (name, email, role, password). Admin can also list every interview: candidate, interviewer, the recruiter who created it, date, start, duration, and status. Admin does not manage scheduling.
-- **Recruiter** creates interviews, picks the candidate and interviewer, chooses the date, start, and duration, and handles reschedule requests.
+- **Recruiter** picks candidates, an interviewer pool, a duration, and a date range. Runs matching, confirms proposals, and handles reschedule requests.
 - **Candidate** sees their upcoming interviews and can accept or request a new start.
 - **Interviewer** sees a read-only calendar of their interviews.
 
-Automatic candidate-to-interviewer matching is a later feature. For now a recruiter picks both people by hand.
+The recruiter chooses which interviewers are eligible, as the pool. Matching picks the interviewer from that pool.
 
 ## Login
 
@@ -44,6 +44,10 @@ All times are UTC. There is no per-user timezone yet.
 
 **Working window.** A slot starts at or after 09:00 UTC and ends at or before 17:00 UTC on its UTC date.
 
+**Future only.** A new or replacement slot must start after the current time.
+
+**Availability.** There is no stored availability yet. A person is free throughout the working window unless a blocking interview covers that time.
+
 **Half-open intervals.** A slot is `[starts_at, ends_at)`. A new interview may start at the exact moment another one ends, for the same candidate or the same interviewer. Two slots overlap only when `existing.starts_at < new.ends_at` and `new.starts_at < existing.ends_at`.
 
 **Which bookings block time.** An interview in `AWAITING_CANDIDATE`, `ACCEPTED`, or `RESCHEDULE_REQUESTED` blocks its official `[starts_at, ends_at)` for both its candidate and its interviewer.
@@ -55,19 +59,121 @@ All times are UTC. There is no per-user timezone yet.
 
 A new slot is allowed only when `[starts_at, starts_at + duration)` lies entirely inside one common free gap. The recruiter's duration must therefore fit inside a gap, not span two.
 
-## Calendar flow
+## Matching
 
-1. The recruiter picks one candidate and one interviewer.
-2. A calendar of weekdays appears.
-3. The recruiter clicks a date. The system lists that date's common free gaps, in UTC.
-4. The recruiter picks a start time and a duration that fit inside one gap, then creates the interview.
-5. The interview is saved as `AWAITING_CANDIDATE`.
+Matching proposes slots. It never saves anything. The recruiter confirms a proposal, and only then are interviews created or changed.
+
+### Inputs
+
+| Mode | Who is scheduled | Duration |
+| --- | --- | --- |
+| Single create | One candidate | Any duration the recruiter enters |
+| Bulk create | Many candidates | One common duration for all |
+| Single reschedule | One `RESCHEDULE_REQUESTED` interview | The interview's existing duration |
+| Bulk reschedule | Many `RESCHEDULE_REQUESTED` interviews | Each interview's existing duration |
+
+Every mode also takes:
+
+- An interviewer pool. For a reschedule, the pool starts with the interview's current interviewer, and the recruiter may add more.
+- A date range, `fromDate` to `toDate` (UTC dates). Weekends in the range are skipped.
+
+### Candidate starts
+
+For each weekday in the range and each pool interviewer, matching takes the common free gaps of the candidate and that interviewer. Inside each gap, it takes the earliest start on the 15-minute grid (`:00`, `:15`, `:30`, `:45`) after the current time where `[start, start + duration)` still fits. Each gap yields at most one option, so one long gap does not fill the list with 09:00, 09:15, 09:30, and so on.
+
+### Ranking
+
+Each option is one interviewer and one start. Options are sorted by the keys below, in order. A later key is looked at only when two options are equal on every earlier key.
+
+**Load.** An interviewer's load is the total booked minutes of their blocking interviews in the date range. It is not the number of interviews. An interviewer with one 240-minute interview (load 240) ranks after one with four 15-minute interviews (load 60).
+
+- In bulk mode, load also counts the minutes of slots already proposed earlier in the same run.
+- In a reschedule, the interview being rescheduled is not counted toward its current interviewer's load.
+
+#### Create
+
+1. Earlier start.
+2. Lower load.
+3. Lower interviewer id.
+
+#### Reschedule
+
+Options fall into two groups. The whole first group ranks above the whole second group, even when a second-group option starts earlier.
+
+**Group A: options at the candidate's requested start.** This group exists only when `requested_starts_at` passes the slot rules and the candidate and at least one pool interviewer are free for `[requested_starts_at, requested_starts_at + duration)`. All options in it share the same start, and they are ordered:
+
+1. The current interviewer.
+2. Lower load.
+3. Lower interviewer id.
+
+**Group B: every other option.** This means every option at any other start, from every pool interviewer, including the current one. Group B is ordered:
+
+1. Earlier start.
+2. The current interviewer, only between options with the same start.
+3. Lower load.
+4. Lower interviewer id.
+
+So the current interviewer is preferred only at an equal start. An earlier slot with another interviewer still ranks above a later slot with the current interviewer.
+
+If group A is empty, because the request is invalid or nobody is free then, the list is group B alone.
+
+#### Examples
+
+In each example, I1 is the current interviewer, the duration is 60 minutes, and the candidate asked for Wed 14:00.
+
+| Situation | Order |
+| --- | --- |
+| I1 and I2 both free Wed 14:00 | I1 Wed 14:00 (current interviewer), then I2 Wed 14:00, then group B |
+| I1 busy Wed 14:00. I2 (load 120) and I3 (load 60) free then | I3 Wed 14:00 (lower load), then I2 Wed 14:00, then group B |
+| I2 and I3 free Wed 14:00, both load 60 | I2 Wed 14:00 (lower id), then I3 Wed 14:00 |
+| Nobody free Wed 14:00. I2's earliest is Tue 09:00, I1's is Tue 11:00 | I2 Tue 09:00 (earlier start), then I1 Tue 11:00 |
+| Nobody free Wed 14:00. I1 and I2 both free Tue 09:00 | I1 Tue 09:00 (current interviewer at an equal start), then I2 Tue 09:00 |
+| Request is Wed 16:30, which would end at 17:30 | Group A is empty, so the list is group B only |
+| I2 free Wed 14:00, and I1 free Tue 09:00 | I2 Wed 14:00 (group A), then I1 Tue 09:00 (group B) |
+
+For create, with no requested start and no current interviewer: if I1 (load 240) and I2 (load 60) are both free Tue 09:00, I2 ranks first. If both have load 60, I1 ranks first by lower id.
+
+### Single mode
+
+Shows the top 5 options, each a pair of interviewer and start. The same interviewer may appear more than once, for a different gap or day. The recruiter picks one and confirms.
+
+### Bulk mode
+
+Greedy, with one proposed slot per candidate:
+
+1. Load the blocking intervals for every candidate and every pool interviewer over the range.
+2. Order the candidates most constrained first: fewest free working minutes in the range, then lower candidate id.
+3. For each candidate in that order, take the top-ranked option. Reserve that slot in memory for both people, so later candidates in the same run cannot overlap it.
+4. A candidate with no option goes to an unplaced list, with the reason.
+
+Greedy is not guaranteed to place everyone when some placement exists. It is predictable, fast, and places everyone in most real cases.
+
+### No slot found
+
+- **Create:** the candidate is listed as unplaced. No interview is created for them.
+- **Reschedule:** nothing changes. The interview stays `RESCHEDULE_REQUESTED`, and its official slot stays booked.
+
+The recruiter can widen the date range, add interviewers to the pool, or stop.
+
+### Confirm
+
+A proposal is not stored and reserves nothing. Another recruiter can book one of the same people before this recruiter confirms. Confirm therefore runs in one transaction:
+
+1. Lock every involved `app_user` row, ordered by id.
+2. Recheck each slot against the slot rules, the database, and the other slots in the batch.
+3. Save all slots, or none.
+
+If any slot conflicts, nothing is saved. The message names the slot that conflicts, and the recruiter runs matching again.
 
 ## Interview lifecycle
 
-1. The recruiter creates the interview through the calendar flow above.
+1. The recruiter creates interviews by confirming a matching proposal. Each is saved as `AWAITING_CANDIDATE`.
 2. The candidate either accepts (`ACCEPTED`) or asks for a different start (`RESCHEDULE_REQUESTED`).
-3. On a reschedule request, the official slot is unchanged. The recruiter later picks a replacement through the same calendar flow for the same candidate and interviewer. The replacement must lie inside one common free gap. The interview's own current slot does not block its replacement. On save, the replacement becomes the official slot, the requested start is cleared, and the interview returns to `AWAITING_CANDIDATE`.
+3. On a reschedule request, the official slot is unchanged. The recruiter runs reschedule matching and confirms a replacement. The interview's own current slot does not block its replacement. The replacement may have a different interviewer from the pool. On save:
+   - the replacement becomes the official slot,
+   - the interviewer is updated if it changed,
+   - the requested start is cleared,
+   - the interview returns to `AWAITING_CANDIDATE`.
 4. The candidate must accept the replacement. They can request another reschedule instead.
 
 Status transitions:
@@ -83,7 +189,7 @@ Table details are in `docs/schema.md`.
 Built later, in this order of need:
 
 - **Login**: one Spring Security form for all roles, backed by a session.
-- **Recruiter scheduling**: pick candidate and interviewer, then a weekday calendar, then a date with its common free gaps, then a create form with start and duration. Replacements use the same screens.
+- **Recruiter scheduling**: pick candidates (or reschedule requests), an interviewer pool, a duration, and a date range. Then review the proposal and confirm. Single mode shows the top 5 options to choose from. Bulk mode shows one slot per candidate plus the unplaced list.
 - **Candidate dashboard**: upcoming interviews, accept, or request a new start.
 - **Interviewer calendar**: read-only view. Each cell shows "has an interview" or "free" (no interview in that range). Interviewers do not enter availability yet.
 - **Admin**: create and edit users, list all interviews.
@@ -96,9 +202,9 @@ Thymeleaf renders the screens. Spring Validation checks forms on the server.
 - Availability that interviewers set themselves.
 - More than one interviewer per interview.
 - More than one role per person.
-- Automatic candidate-to-interviewer matching.
+- Optimal (non-greedy) bulk assignment.
 - Per-user timezones.
 
 ## Open decisions
 
-None blocking. The decisions above come from the design discussion (prompts 004, 005, 011 to 013, and 017).
+None blocking. The decisions above come from the design discussion (prompts 004, 005, 011 to 013, 017, 023, and 024).

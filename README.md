@@ -1,6 +1,6 @@
 # Interview Scheduling
 
-Recruiters choose one candidate and one interviewer, look at a calendar of their common free time, and book a start and duration. The candidate accepts that slot or asks to reschedule.
+Recruiters choose one or more candidates, a pool of interviewers, a duration, and a date range. The system proposes an interviewer and a start for each candidate, and the recruiter confirms. The candidate accepts that slot or asks to reschedule, and rescheduling uses the same matching.
 
 ## Stack
 

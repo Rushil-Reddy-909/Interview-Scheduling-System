@@ -26,7 +26,7 @@ Only an admin creates or updates rows here.
 | id | bigint, PK | Generated |
 | recruiter_id | bigint, FK to `app_user.id`, required | Must have role `RECRUITER`. Set once, when the interview is created |
 | candidate_id | bigint, FK to `app_user.id`, required | Must have role `CANDIDATE` |
-| interviewer_id | bigint, FK to `app_user.id`, required | Must have role `INTERVIEWER` |
+| interviewer_id | bigint, FK to `app_user.id`, required | Must have role `INTERVIEWER`. A confirmed replacement may change it to another interviewer from the recruiter's pool |
 | duration_minutes | integer, required | Set by the recruiter. Does not change during a reschedule |
 | starts_at | timestamp (UTC), required | Official slot start. Holds the date and the time. The interview's date is the UTC date of this value |
 | ends_at | timestamp (UTC), required | Always `starts_at + duration_minutes`. Written only by the service |
@@ -48,7 +48,12 @@ stateDiagram-v2
   RescheduleRequested --> AwaitingCandidate: recruiter sets replacement slot
 ```
 
-When a replacement is set, `starts_at` and `ends_at` change, `requested_starts_at` becomes null, and `status` becomes `AWAITING_CANDIDATE`.
+When a replacement is set:
+
+- `starts_at` and `ends_at` change, and `interviewer_id` changes if the chosen option uses another interviewer.
+- `duration_minutes` stays the same.
+- `requested_starts_at` becomes null.
+- `status` becomes `AWAITING_CANDIDATE`.
 
 ### Slot rules
 
@@ -57,6 +62,7 @@ Enforced by the service on create, on a candidate's requested start, and on a re
 - `ends_at = starts_at + duration_minutes`.
 - The UTC date of `starts_at` is Monday through Friday, and `ends_at` falls on that same UTC date.
 - `starts_at >= 09:00 UTC` and `ends_at <= 17:00 UTC`.
+- For a new or replacement slot, `starts_at` is after the current time. Matching only proposes starts on the 15-minute grid.
 - Intervals are half-open, `[starts_at, ends_at)`. A slot may start at the moment another ends.
 
 Overlap check for a new official slot (create or replacement). Two interviews overlap when `existing.starts_at < new.ends_at AND new.starts_at < existing.ends_at`. Check against other interviews where:
@@ -75,7 +81,21 @@ For a pair of people, run the query for both and take the gaps where both are fr
 
 The replacement check excludes the interview being changed, so its current slot does not block its own replacement.
 
-The service runs the overlap check and the write in one transaction, after locking the candidate and interviewer `app_user` rows, ordered by id. Two requests can otherwise both see a free slot and both commit. A unique index cannot express "these ranges must not overlap." H2 has no exclusion constraints, so the database cannot enforce the range rule on its own. A later move to PostgreSQL could add a GiST exclusion constraint on `(interviewer_id, [starts_at, ends_at))` and the same for `candidate_id`.
+### Matching range query
+
+Matching loads busy time for many people over a date range at once, not one date at a time. It runs one query for the candidates and one for the pool interviewers:
+
+- `candidate_id IN (...)` or `interviewer_id IN (...)`,
+- `status` in the three blocking statuses,
+- `starts_at < rangeEnd AND ends_at > rangeStart`, where the range is `fromDate` 00:00 UTC to the day after `toDate`, 00:00 UTC.
+
+Gaps, rankings, and in-run reservations are computed in memory. A proposal is never stored.
+
+### Confirm transaction
+
+Confirming a proposal locks all involved `app_user` rows, meaning every candidate and every chosen interviewer in the batch, in ascending id order. It then rechecks every slot and saves all of them or none.
+
+The service runs the overlap check and the write in one transaction, after locking the involved `app_user` rows, ordered by id. Two requests can otherwise both see a free slot and both commit. A unique index cannot express "these ranges must not overlap." H2 has no exclusion constraints, so the database cannot enforce the range rule on its own. A later move to PostgreSQL could add a GiST exclusion constraint on `(interviewer_id, [starts_at, ends_at))` and the same for `candidate_id`.
 
 ### Indexes
 
@@ -90,7 +110,8 @@ A dashboard query is `person_id = ? AND starts_at >= ? ORDER BY starts_at`. The 
 ## Not in the schema yet
 
 - Cancellation. There is no `CANCELLED` status yet.
-- Availability for interviewers.
+- Availability for interviewers or candidates. Everyone is free in the working window unless booked.
+- Stored proposals or temporary holds. Proposals are computed and rechecked on confirm.
 - More than one interviewer per interview. That would need a join table.
 - Per-user timezone.
 - Audit history of reschedule requests. Only the current open request is stored.
