@@ -1,6 +1,6 @@
 # Interview Scheduling
 
-Recruiters choose a candidate and one or more interviewers. The system proposes interview slots. The candidate confirms a slot or asks to reschedule.
+Recruiters choose one candidate and one interviewer, look at a calendar of their common free time, and book a start and duration. The candidate accepts that slot or asks to reschedule.
 
 ## Stack
 
@@ -37,6 +37,17 @@ The H2 console is at <http://localhost:8080/h2-console>. JDBC URL: `jdbc:h2:file
 
 Data lives in `./data/`, so it survives restarts. Delete that folder to start with an empty database. The folder is git-ignored.
 
+## Bootstrap admin
+
+On startup, if the database has no user with role `ADMIN`, the app inserts one. The password is stored as a BCrypt hash.
+
+| Property | Local default |
+| --- | --- |
+| `app.admin.email` | `admin@localhost` |
+| `app.admin.password` | `change-me` |
+
+Change both before the app is used outside a local database. Login screens are not built yet.
+
 ## Tests
 
 ```bash
@@ -49,14 +60,18 @@ Data lives in `./data/`, so it survives restarts. Delete that folder to start wi
 | --- | --- |
 | `AGENTS.md` | Instructions Cursor loads for every agent chat in this repo |
 | `docs/design.md` | Product behavior, Thymeleaf decision, open questions |
-| `docs/schema.md` | Proposed tables. Nothing here is created in code yet |
+| `docs/schema.md` | `app_user` and `interview`, including overlap rules |
 | `docs/prompts/` | Verbatim record of user prompts |
 
 ## Layout
 
 ```text
-src/main/java/com/interviewscheduling/       application entry point
-src/main/java/com/interviewscheduling/web/   page controllers
-src/main/resources/templates/                Thymeleaf templates
-src/main/resources/application.properties    local H2 and JPA settings
+src/main/java/com/interviewscheduling/            application entry point
+src/main/java/com/interviewscheduling/domain/      JPA entities for users and interviews
+src/main/java/com/interviewscheduling/enums/       role and interview status
+src/main/java/com/interviewscheduling/repository/  Spring Data repositories
+src/main/java/com/interviewscheduling/seed/        bootstrap admin
+src/main/java/com/interviewscheduling/web/       page controllers
+src/main/resources/templates/                     Thymeleaf templates
+src/main/resources/application.properties         local H2, JPA, and admin seed settings
 ```
