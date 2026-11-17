@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('My calendar')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: topbar('interviewer-home')}"></header>
+<main class="page">
+    <div th:replace="~{fragments/layout :: flash}"></div>
+
+    <div class="page-header">
+        <div>
+            <h1>My calendar</h1>
+            <p class="subtitle">A read-only view of your interviews. Free means you have no interview at that time. Recruiters book from it.</p>
+        </div>
+        <div class="week-nav">
+            <a class="btn btn-secondary btn-sm" th:href="@{/dashboard/interviewer(week=${calendar.previousWeek()})}" aria-label="Previous week">&larr;</a>
+            <span class="week-title"
+                  th:text="${#temporals.format(calendar.weekStart, 'd MMM')} + ' – ' + ${#temporals.format(calendar.weekEnd(), 'd MMM yyyy')}">23 – 27 Nov 2026</span>
+            <a class="btn btn-secondary btn-sm" th:href="@{/dashboard/interviewer(week=${calendar.nextWeek()})}" aria-label="Next week">&rarr;</a>
+            <a class="btn btn-ghost btn-sm" th:href="@{/dashboard/interviewer(week=${thisWeek})}">This week</a>
+        </div>
+    </div>
+
+    <div th:replace="~{fragments/layout :: preview-banner}"></div>
+
+    <div class="card">
+        <div class="card-head">
+            <div class="legend">
+                <span>Has an interview:</span>
+                <span><i class="swatch status-awaiting_candidate"></i>Awaiting candidate</span>
+                <span><i class="swatch status-accepted"></i>Accepted</span>
+                <span><i class="swatch status-reschedule_requested"></i>Reschedule requested</span>
+                <span><i class="swatch"></i>Free</span>
+            </div>
+            <span class="subtle">Monday to Friday, 09:00–17:00 UTC</span>
+        </div>
+        <div class="calendar-wrap">
+            <table class="calendar">
+                <thead>
+                <tr>
+                    <th class="time-col"><span class="sr-only">Time</span></th>
+                    <th th:each="day : ${calendar.days}" th:classappend="${day.today} ? 'is-today'">
+                        <span class="dow" th:text="${#temporals.format(day.date, 'EEE')}">Mon</span>
+                        <span th:text="${#temporals.format(day.date, 'd MMM')}">23 Nov</span>
+                        <span class="day-summary"
+                              th:text="${day.interviewCount == 0} ? 'Free all day' : (${day.interviewCount} + (${day.interviewCount == 1} ? ' interview' : ' interviews') + ' · ' + ${day.freeMinutes / 60} + 'h ' + ${day.freeMinutes % 60} + 'm free')">1 interview</span>
+                    </th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="time, row : ${calendar.times}"
+                    th:classappend="${time.minute == 0} ? 'on-hour' : (${time.minute == 30} ? 'on-half')">
+                    <td class="time" th:text="${time.minute == 0} ? ${#temporals.format(time, 'HH:mm')} : ''">09:00</td>
+                    <th:block th:each="day : ${calendar.days}" th:with="cell=${day.cells[row.index]}">
+                        <td th:if="${cell.free()}" class="free"
+                            th:attr="aria-label=${#temporals.format(day.date, 'EEE')} + ' ' + ${#temporals.format(time, 'HH:mm')} + ' free'"></td>
+                        <td th:if="${cell.first}" class="busy" th:rowspan="${cell.span}">
+                            <div class="event" th:classappend="'status-' + ${#strings.toLowerCase(cell.interview.status.name())}">
+                                <strong th:text="${cell.interview.candidate.name}">Asha Verma</strong>
+                                <span th:text="${#temporals.format(cell.interview.startsAt, 'HH:mm')} + '–' + ${#temporals.format(cell.interview.endsAt(), 'HH:mm')}">10:00–11:00</span>
+                            </div>
+                        </td>
+                    </th:block>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <section class="section">
+        <div class="card">
+            <div class="card-head">
+                <div>
+                    <h2>Upcoming interviews</h2>
+                    <p>Ask the recruiter if a slot needs to change. You do not set availability here yet.</p>
+                </div>
+            </div>
+            <div class="table-wrap" th:unless="${upcoming.isEmpty()}">
+                <table class="table">
+                    <thead>
+                    <tr>
+                        <th>Candidate</th>
+                        <th>Slot</th>
+                        <th class="num">Duration</th>
+                        <th>Recruiter</th>
+                        <th>Status</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="interview : ${upcoming}">
+                        <td><div th:replace="~{fragments/ui :: person(${interview.candidate})}"></div></td>
+                        <td><span th:replace="~{fragments/ui :: slot(${interview.startsAt}, ${interview.endsAt()})}"></span></td>
+                        <td class="num" th:text="${interview.durationMinutes} + ' min'">60 min</td>
+                        <td th:text="${interview.recruiter.name}">Recruiter</td>
+                        <td><span th:replace="~{fragments/ui :: status(${interview.status})}"></span></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="empty" th:if="${upcoming.isEmpty()}">
+                <h3>No upcoming interviews</h3>
+                <p>Your calendar is free.</p>
+            </div>
+        </div>
+    </section>
+</main>
+</body>
+</html>

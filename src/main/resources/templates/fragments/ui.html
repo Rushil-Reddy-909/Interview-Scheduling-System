@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<th:block th:fragment="status(status)" th:switch="${status.name()}">
+    <span th:case="'AWAITING_CANDIDATE'" class="badge badge-warning">Awaiting candidate</span>
+    <span th:case="'ACCEPTED'" class="badge badge-success">Accepted</span>
+    <span th:case="'RESCHEDULE_REQUESTED'" class="badge badge-purple">Reschedule requested</span>
+</th:block>
+
+<th:block th:fragment="role(role)" th:switch="${role}">
+    <span th:case="'ADMIN'" class="role role-admin">Admin</span>
+    <span th:case="'RECRUITER'" class="role role-recruiter">Recruiter</span>
+    <span th:case="'CANDIDATE'" class="role role-candidate">Candidate</span>
+    <span th:case="'INTERVIEWER'" class="role role-interviewer">Interviewer</span>
+</th:block>
+
+<div th:fragment="person(user)" class="person">
+    <span class="avatar" th:text="${user.initials()}">AV</span>
+    <span class="person-text">
+        <span class="person-name" th:text="${user.name}">Name</span>
+        <span class="person-email" th:text="${user.email}">email@localhost</span>
+    </span>
+</div>
+
+<span th:fragment="slot(start, end)" class="slot">
+    <span class="slot-date" th:text="${#temporals.format(start, 'EEE d MMM yyyy')}">Mon 23 Nov 2026</span>
+    <span class="slot-time" th:text="${#temporals.format(start, 'HH:mm')} + '–' + ${#temporals.format(end, 'HH:mm')} + ' UTC'">09:00–10:00 UTC</span>
+</span>
+
+<span th:fragment="when(start)" class="slot-inline" th:text="${#temporals.format(start, 'EEE d MMM, HH:mm')} + ' UTC'">Mon 23 Nov, 09:00 UTC</span>
+
+</body>
+</html>

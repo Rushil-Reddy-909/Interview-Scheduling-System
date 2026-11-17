@@ -7,5 +7,5 @@ import jakarta.validation.constraints.NotBlank;
 
 @ConfigurationProperties(prefix = "app.admin")
 @Validated
-public record AdminProperties(@NotBlank String email, @NotBlank String password) {
+public record AdminProperties(@NotBlank String password) {
 }

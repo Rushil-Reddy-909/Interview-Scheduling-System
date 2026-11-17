@@ -26,15 +26,23 @@ class AdminSeedTests {
 	private EntityManager entityManager;
 
 	@Test
-	void seedsASingleAdminAndCreatesTheInterviewTable() {
-		var admin = users.findByEmail("admin@localhost").orElseThrow();
+	void seedsOneUserPerRoleAndCreatesTheInterviewTable() {
+		for (UserRole role : UserRole.values()) {
+			String email = role.name().toLowerCase() + "@localhost";
+			var user = users.findByEmail(email).orElseThrow();
 
-		assertEquals(UserRole.ADMIN, admin.getRole());
-		assertEquals("Admin", admin.getName());
-		assertTrue(passwordEncoder.matches("change-me", admin.getPasswordHash()));
-		assertEquals(1, users.countByRole(UserRole.ADMIN));
+			assertEquals(role, user.getRole());
+			assertEquals(displayName(role), user.getName());
+			assertTrue(passwordEncoder.matches("12345678", user.getPasswordHash()));
+			assertEquals(1, users.countByRole(role));
+		}
 
 		entityManager.createNativeQuery("select id, starts_at, ends_at, status from interview").getResultList();
+	}
+
+	private static String displayName(UserRole role) {
+		String lower = role.name().toLowerCase();
+		return Character.toUpperCase(lower.charAt(0)) + lower.substring(1);
 	}
 
 }

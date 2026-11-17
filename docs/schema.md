@@ -4,7 +4,7 @@ Status: `app_user` and `interview` are mapped by the JPA entities in `com.interv
 
 Names are snake_case. `user` is reserved in H2, so the people table is `app_user`.
 
-On startup, if no user has role `ADMIN`, `AdminSeedConfiguration` inserts one. The email and password come from `app.admin.email` and `app.admin.password`. The password is stored as a BCrypt hash. The local defaults are `admin@localhost` and `change-me`.
+On startup, for each role that has no user, `AdminSeedConfiguration` inserts one. The email is the role in lowercase plus `@localhost`. The password comes from `app.admin.password` and is stored as a BCrypt hash. The local default is `12345678`. The password is written only when that role's row is created.
 
 ## app_user
 

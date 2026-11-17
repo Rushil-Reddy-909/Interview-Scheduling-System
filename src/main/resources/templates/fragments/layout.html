@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:fragment="head(title)">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${title} + ' · Interview Scheduling'">Interview Scheduling</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+    <script th:src="@{/js/app.js}" defer></script>
+</head>
+<body>
+
+<header th:fragment="topbar(active)" class="topbar">
+    <div class="topbar-inner">
+        <a class="brand" th:href="@{/dashboard}">
+            <span class="brand-mark">IS</span>
+            <span>Interview Scheduling</span>
+        </a>
+
+        <nav class="nav" aria-label="Main" th:switch="${currentRole}">
+            <th:block th:case="'ADMIN'">
+                <a th:href="@{/admin}" th:classappend="${active == 'admin-home'} ? 'active'">Overview</a>
+                <a th:href="@{/admin/users}" th:classappend="${active == 'admin-users'} ? 'active'">Users</a>
+                <a th:href="@{/admin/interviews}" th:classappend="${active == 'admin-interviews'} ? 'active'">Interviews</a>
+            </th:block>
+            <th:block th:case="'RECRUITER'">
+                <a th:href="@{/dashboard/recruiter}" th:classappend="${active == 'recruiter-home'} ? 'active'">Overview</a>
+                <a th:href="@{/dashboard/recruiter/schedule}" th:classappend="${active == 'recruiter-schedule'} ? 'active'">Schedule</a>
+                <a th:href="@{/dashboard/recruiter/reschedule}" th:classappend="${active == 'recruiter-reschedule'} ? 'active'">Reschedule requests</a>
+            </th:block>
+            <th:block th:case="'CANDIDATE'">
+                <a th:href="@{/dashboard/candidate}" th:classappend="${active == 'candidate-home'} ? 'active'">My interviews</a>
+            </th:block>
+            <th:block th:case="'INTERVIEWER'">
+                <a th:href="@{/dashboard/interviewer}" th:classappend="${active == 'interviewer-home'} ? 'active'">My calendar</a>
+            </th:block>
+        </nav>
+
+        <div class="account">
+            <span class="tz-pill" title="All dates and times are UTC">UTC</span>
+            <div class="account-id">
+                <span class="account-name" th:text="${currentName}">Name</span>
+                <span class="account-meta">
+                    <span th:text="${currentEmail}">email@localhost</span>
+                    · <span th:replace="~{fragments/ui :: role(${currentRole})}">Role</span>
+                </span>
+            </div>
+            <form th:action="@{/logout}" method="post">
+                <button class="btn btn-secondary btn-sm" type="submit">Log out</button>
+            </form>
+        </div>
+    </div>
+</header>
+
+<div th:fragment="flash" class="flash-area"><div class="alert alert-success" role="status" th:if="${notice}" th:text="${notice}">Saved.</div><div class="alert alert-error" role="alert" th:if="${error}" th:text="${error}">Something went wrong.</div></div>
+
+<div th:fragment="preview-banner" class="preview-banner">
+    <strong>Preview</strong>
+    <span>Sample data only. Actions show a notice and are not saved until the scheduling services are built.</span>
+</div>
+
+</body>
+</html>

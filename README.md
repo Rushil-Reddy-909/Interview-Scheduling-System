@@ -37,16 +37,28 @@ The H2 console is at <http://localhost:8080/h2-console>. JDBC URL: `jdbc:h2:file
 
 Data lives in `./data/`, so it survives restarts. Delete that folder to start with an empty database. The folder is git-ignored.
 
-## Bootstrap admin
+## Bootstrap users
 
-On startup, if the database has no user with role `ADMIN`, the app inserts one. The password is stored as a BCrypt hash.
+On startup, for each role that has no user, the app inserts one. The password is stored as a BCrypt hash.
 
-| Property | Local default |
-| --- | --- |
-| `app.admin.email` | `admin@localhost` |
-| `app.admin.password` | `change-me` |
+| Role | Email | Password |
+| --- | --- | --- |
+| Admin | `admin@localhost` | `app.admin.password` (`12345678`) |
+| Recruiter | `recruiter@localhost` | `app.admin.password` (`12345678`) |
+| Candidate | `candidate@localhost` | `app.admin.password` (`12345678`) |
+| Interviewer | `interviewer@localhost` | `app.admin.password` (`12345678`) |
 
-Change both before the app is used outside a local database. Login screens are not built yet.
+The password is hashed only when that role's row is created. Changing the property later does not change an existing user. Delete `./data` to seed again.
+
+Change the password before the app is used outside a local database.
+
+## Login
+
+Open <http://localhost:8080/login>. Sign in with one of the seeded emails and the password that was hashed when that user was created. The generated Spring Security user (`user` and the password printed at startup) is not used.
+
+Each role lands on its own dashboard. Logout is the button in the top bar. It ends the session.
+
+The dashboards show sample data from `web/preview/PreviewData`. Form actions only show a notice. Nothing is saved yet.
 
 ## Tests
 
@@ -70,8 +82,12 @@ src/main/java/com/interviewscheduling/            application entry point
 src/main/java/com/interviewscheduling/domain/      JPA entities for users and interviews
 src/main/java/com/interviewscheduling/enums/       role and interview status
 src/main/java/com/interviewscheduling/repository/  Spring Data repositories
-src/main/java/com/interviewscheduling/seed/        bootstrap admin
-src/main/java/com/interviewscheduling/web/       page controllers
-src/main/resources/templates/                     Thymeleaf templates
+src/main/java/com/interviewscheduling/security/    form login and session
+src/main/java/com/interviewscheduling/seed/        bootstrap users
+src/main/java/com/interviewscheduling/web/         page controllers
+src/main/java/com/interviewscheduling/web/preview/ sample data for the dashboards, until services exist
+src/main/resources/templates/fragments/           shared layout and UI fragments
+src/main/resources/templates/                     pages for home, login, admin, recruiter, candidate, interviewer
+src/main/resources/static/                        app.css and app.js
 src/main/resources/application.properties         local H2, JPA, and admin seed settings
 ```

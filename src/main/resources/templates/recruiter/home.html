@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Recruiter overview')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: topbar('recruiter-home')}"></header>
+<main class="page">
+    <div th:replace="~{fragments/layout :: flash}"></div>
+
+    <div class="page-header">
+        <div>
+            <h1>Overview</h1>
+            <p class="subtitle">Upcoming interviews you created, and the candidates who asked for a different start.</p>
+        </div>
+        <div class="actions">
+            <a class="btn btn-secondary" th:href="@{/dashboard/recruiter/reschedule}">
+                Reschedule requests <span class="count" th:text="${requests.size()}">3</span>
+            </a>
+            <a class="btn btn-primary" th:href="@{/dashboard/recruiter/schedule}">Schedule interviews</a>
+        </div>
+    </div>
+
+    <div th:replace="~{fragments/layout :: preview-banner}"></div>
+
+    <div class="stats">
+        <a th:each="stat : ${stats}" class="stat" th:classappend="'tone-' + ${stat.tone}" th:href="${stat.href}">
+            <span class="stat-label" th:text="${stat.label}">Awaiting candidate</span>
+            <span class="stat-value" th:text="${stat.value}">2</span>
+        </a>
+    </div>
+
+    <section class="section" id="requests">
+        <div class="card">
+            <div class="card-head">
+                <div>
+                    <h2>Reschedule requests</h2>
+                    <p>The current slot stays booked until you confirm a replacement.</p>
+                </div>
+                <a class="btn btn-secondary btn-sm" th:if="${requests.size() > 1}"
+                   th:href="@{/dashboard/recruiter/reschedule(mode='bulk', interviewIds=${requestIds})}">Handle all in bulk</a>
+            </div>
+            <div class="table-wrap" th:unless="${requests.isEmpty()}">
+                <table class="table">
+                    <thead>
+                    <tr>
+                        <th>Candidate</th>
+                        <th>Interviewer</th>
+                        <th>Current slot</th>
+                        <th>Asked for</th>
+                        <th class="actions-cell"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="interview : ${requests}">
+                        <td><div th:replace="~{fragments/ui :: person(${interview.candidate})}"></div></td>
+                        <td th:text="${interview.interviewer.name}">Interviewer</td>
+                        <td><span th:replace="~{fragments/ui :: slot(${interview.startsAt}, ${interview.endsAt()})}"></span></td>
+                        <td><span th:replace="~{fragments/ui :: slot(${interview.requestedStartsAt}, ${interview.requestedEndsAt()})}"></span></td>
+                        <td class="actions-cell">
+                            <a class="btn btn-primary btn-sm"
+                               th:href="@{/dashboard/recruiter/reschedule(mode='single', interviewIds=${interview.id}, propose=true)}">Find replacement</a>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="empty" th:if="${requests.isEmpty()}">
+                <h3>No open requests</h3>
+                <p>When a candidate asks for a different start, it shows up here.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="section" id="upcoming">
+        <div class="card">
+            <div class="card-head">
+                <div>
+                    <h2>Upcoming interviews</h2>
+                    <p>Everything you created that has not ended yet.</p>
+                </div>
+            </div>
+            <div class="table-wrap" th:unless="${upcoming.isEmpty()}">
+                <table class="table">
+                    <thead>
+                    <tr>
+                        <th>Candidate</th>
+                        <th>Interviewer</th>
+                        <th>Slot</th>
+                        <th class="num">Duration</th>
+                        <th>Status</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="interview : ${upcoming}">
+                        <td><div th:replace="~{fragments/ui :: person(${interview.candidate})}"></div></td>
+                        <td th:text="${interview.interviewer.name}">Interviewer</td>
+                        <td><span th:replace="~{fragments/ui :: slot(${interview.startsAt}, ${interview.endsAt()})}"></span></td>
+                        <td class="num" th:text="${interview.durationMinutes} + ' min'">60 min</td>
+                        <td><span th:replace="~{fragments/ui :: status(${interview.status})}"></span></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="empty" th:if="${upcoming.isEmpty()}">
+                <h3>Nothing scheduled</h3>
+                <p><a th:href="@{/dashboard/recruiter/schedule}">Schedule your first interviews.</a></p>
+            </div>
+        </div>
+    </section>
+</main>
+</body>
+</html>

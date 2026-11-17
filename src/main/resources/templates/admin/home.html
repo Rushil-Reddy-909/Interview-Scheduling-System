@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Admin overview')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: topbar('admin-home')}"></header>
+<main class="page">
+    <div th:replace="~{fragments/layout :: flash}"></div>
+
+    <div class="page-header">
+        <div>
+            <h1>Overview</h1>
+            <p class="subtitle">People and interviews across the whole system. Scheduling itself is handled by recruiters.</p>
+        </div>
+        <div class="actions">
+            <a class="btn btn-secondary" th:href="@{/admin/interviews}">All interviews</a>
+            <a class="btn btn-primary" th:href="@{/admin/users(add=true)}">Add user</a>
+        </div>
+    </div>
+
+    <div th:replace="~{fragments/layout :: preview-banner}"></div>
+
+    <section class="section">
+        <div class="section-head">
+            <h2>Users by role</h2>
+            <a th:href="@{/admin/users}">Manage users</a>
+        </div>
+        <div class="stats">
+            <a th:each="stat : ${userStats}" class="stat" th:classappend="'tone-' + ${stat.tone}" th:href="@{${stat.href}}">
+                <span class="stat-label" th:text="${stat.label}">Admins</span>
+                <span class="stat-value" th:text="${stat.value}">1</span>
+            </a>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="section-head">
+            <h2>Interviews by status</h2>
+            <a th:href="@{/admin/interviews}">See all</a>
+        </div>
+        <div class="stats">
+            <a th:each="stat : ${interviewStats}" class="stat" th:classappend="'tone-' + ${stat.tone}" th:href="@{${stat.href}}">
+                <span class="stat-label" th:text="${stat.label}">Accepted</span>
+                <span class="stat-value" th:text="${stat.value}">3</span>
+            </a>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="card">
+            <div class="card-head">
+                <div>
+                    <h2>Next interviews</h2>
+                    <p>The next six booked slots, for every recruiter.</p>
+                </div>
+                <a class="btn btn-secondary btn-sm" th:href="@{/admin/interviews}">View all</a>
+            </div>
+            <div class="table-wrap" th:unless="${upcoming.isEmpty()}">
+                <table class="table">
+                    <thead>
+                    <tr>
+                        <th>Candidate</th>
+                        <th>Interviewer</th>
+                        <th>Recruiter</th>
+                        <th>Slot</th>
+                        <th class="num">Duration</th>
+                        <th>Status</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="interview : ${upcoming}">
+                        <td><div th:replace="~{fragments/ui :: person(${interview.candidate})}"></div></td>
+                        <td th:text="${interview.interviewer.name}">Interviewer</td>
+                        <td th:text="${interview.recruiter.name}">Recruiter</td>
+                        <td><span th:replace="~{fragments/ui :: slot(${interview.startsAt}, ${interview.endsAt()})}"></span></td>
+                        <td class="num" th:text="${interview.durationMinutes} + ' min'">60 min</td>
+                        <td><span th:replace="~{fragments/ui :: status(${interview.status})}"></span></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="empty" th:if="${upcoming.isEmpty()}">
+                <h3>No upcoming interviews</h3>
+                <p>Interviews appear here once a recruiter confirms a proposal.</p>
+            </div>
+        </div>
+    </section>
+</main>
+</body>
+</html>

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('All interviews')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: topbar('admin-interviews')}"></header>
+<main class="page">
+    <div th:replace="~{fragments/layout :: flash}"></div>
+
+    <div class="page-header">
+        <div>
+            <h1>All interviews</h1>
+            <p class="subtitle">Every interview, past and upcoming, with the recruiter who created it. This list is read-only. Recruiters change slots.</p>
+        </div>
+    </div>
+
+    <div th:replace="~{fragments/layout :: preview-banner}"></div>
+
+    <div class="card">
+        <form class="filters" th:action="@{/admin/interviews}" method="get">
+            <div class="field grow">
+                <label for="q">Person</label>
+                <input class="input" id="q" name="q" type="search" placeholder="Candidate, interviewer, or recruiter" th:value="${q}">
+            </div>
+            <div class="field">
+                <label for="status">Status</label>
+                <select class="select" id="status" name="status">
+                    <option value="">All statuses</option>
+                    <option th:each="s : ${statuses}" th:value="${s.name()}" th:selected="${s.name() == selectedStatus}"
+                            th:text="${#strings.capitalize(#strings.toLowerCase(#strings.replace(s.name(), '_', ' ')))}">Accepted</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="from">From</label>
+                <input class="input" id="from" name="from" type="date" th:value="${from}">
+            </div>
+            <div class="field">
+                <label for="to">To</label>
+                <input class="input" id="to" name="to" type="date" th:value="${to}">
+            </div>
+            <button class="btn btn-secondary" type="submit">Filter</button>
+            <a class="btn btn-ghost" th:href="@{/admin/interviews}"
+               th:if="${!q.isEmpty() or !selectedStatus.isEmpty() or from != null or to != null}">Clear</a>
+        </form>
+
+        <div class="table-wrap" th:unless="${interviews.isEmpty()}">
+            <table class="table">
+                <thead>
+                <tr>
+                    <th>Candidate</th>
+                    <th>Interviewer</th>
+                    <th>Recruiter</th>
+                    <th>Date</th>
+                    <th>Start</th>
+                    <th class="num">Duration</th>
+                    <th>Status</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="interview : ${interviews}">
+                    <td><div th:replace="~{fragments/ui :: person(${interview.candidate})}"></div></td>
+                    <td th:text="${interview.interviewer.name}">Interviewer</td>
+                    <td th:text="${interview.recruiter.name}">Recruiter</td>
+                    <td class="nowrap" th:text="${#temporals.format(interview.startsAt, 'EEE d MMM yyyy')}">Mon 23 Nov 2026</td>
+                    <td class="slot-inline" th:text="${#temporals.format(interview.startsAt, 'HH:mm')} + '–' + ${#temporals.format(interview.endsAt(), 'HH:mm')}">09:00–10:00</td>
+                    <td class="num" th:text="${interview.durationMinutes} + ' min'">60 min</td>
+                    <td>
+                        <span th:replace="~{fragments/ui :: status(${interview.status})}"></span>
+                        <div class="subtle" th:if="${interview.requestedStartsAt != null}"
+                             th:text="'Asked for ' + ${#temporals.format(interview.requestedStartsAt, 'EEE d MMM, HH:mm')}">Asked for Wed 25 Nov, 15:00</div>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="empty" th:if="${interviews.isEmpty()}">
+            <h3>No interviews match</h3>
+            <p>Widen the date range or clear the filters.</p>
+        </div>
+        <div class="card-foot">
+            <span class="subtle" th:text="'Showing ' + ${interviews.size()} + ' of ' + ${totalInterviews} + ' interviews'">Showing 11 of 11 interviews</span>
+            <span class="subtle">All times are UTC.</span>
+        </div>
+    </div>
+</main>
+</body>
+</html>

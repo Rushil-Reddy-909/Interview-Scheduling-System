@@ -25,23 +25,31 @@ public class AdminSeedConfiguration {
 	}
 
 	@Bean
-	ApplicationRunner adminSeed(AppUserRepository users, AdminProperties admin, PasswordEncoder passwordEncoder) {
+	ApplicationRunner userSeed(AppUserRepository users, AdminProperties admin, PasswordEncoder passwordEncoder) {
 		return args -> {
-			if (users.existsByRole(UserRole.ADMIN)) {
-				return;
+			for (UserRole role : UserRole.values()) {
+				if (users.existsByRole(role)) {
+					continue;
+				}
+				String email = role.name().toLowerCase() + "@localhost";
+				if (users.findByEmail(email).isPresent()) {
+					throw new IllegalStateException(
+							"Cannot seed " + role + " because that email already belongs to another user: " + email);
+				}
+				AppUser user = new AppUser();
+				user.setName(displayName(role));
+				user.setEmail(email);
+				user.setPasswordHash(passwordEncoder.encode(admin.password()));
+				user.setRole(role);
+				users.save(user);
+				log.info("Seeded bootstrap {} {}", role, email);
 			}
-			if (users.findByEmail(admin.email()).isPresent()) {
-				throw new IllegalStateException(
-						"Cannot seed admin because that email already belongs to another user: " + admin.email());
-			}
-			AppUser user = new AppUser();
-			user.setName("Admin");
-			user.setEmail(admin.email());
-			user.setPasswordHash(passwordEncoder.encode(admin.password()));
-			user.setRole(UserRole.ADMIN);
-			users.save(user);
-			log.info("Seeded bootstrap admin {}", admin.email());
 		};
+	}
+
+	private static String displayName(UserRole role) {
+		String lower = role.name().toLowerCase();
+		return Character.toUpperCase(lower.charAt(0)) + lower.substring(1);
 	}
 
 }

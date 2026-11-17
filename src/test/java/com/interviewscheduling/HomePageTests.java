@@ -23,7 +23,7 @@ class HomePageTests {
 		mockMvc.perform(get("/"))
 				.andExpect(status().isOk())
 				.andExpect(content().string(containsString("Interview Scheduling")))
-				.andExpect(content().string(containsString("scaffold is running")));
+				.andExpect(content().string(containsString("Log in")));
 	}
 
 }

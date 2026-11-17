@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Log in')}"></head>
+<body>
+<main class="auth-shell">
+    <div class="auth-card">
+        <a class="brand" th:href="@{/}">
+            <span class="brand-mark">IS</span>
+            <span>Interview Scheduling</span>
+        </a>
+        <div class="card card-body">
+            <h1>Log in</h1>
+            <p class="lead">Use the email and password your admin gave you.</p>
+
+            <div class="alert alert-error" role="alert" th:if="${param.error}">The email or password is wrong.</div>
+            <div class="alert alert-success" role="status" th:if="${param.logout}">You have logged out.</div>
+
+            <form th:action="@{/login}" method="post" class="stack">
+                <div class="field">
+                    <label for="email">Email</label>
+                    <input class="input" id="email" type="email" name="email" autocomplete="username" required autofocus>
+                </div>
+                <div class="field">
+                    <label for="password">Password</label>
+                    <input class="input" id="password" type="password" name="password" autocomplete="current-password" required>
+                </div>
+                <button class="btn btn-primary btn-block" type="submit">Log in</button>
+            </form>
+        </div>
+    </div>
+</main>
+</body>
+</html>

@@ -1,12 +1,43 @@
 <!DOCTYPE html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Interview Scheduling</title>
-</head>
+<head th:replace="~{fragments/layout :: head('Welcome')}"></head>
 <body>
-    <h1 th:text="${appName}">Interview Scheduling</h1>
-    <p>The application scaffold is running. Scheduling screens are not built yet.</p>
+<main>
+    <section class="hero">
+        <a class="brand" th:href="@{/}">
+            <span class="brand-mark">IS</span>
+            <span th:text="${appName}">Interview Scheduling</span>
+        </a>
+        <h1>Schedule interviews without the back-and-forth</h1>
+        <p>Recruiters pick candidates, an interviewer pool, a duration, and a date range. The system proposes free slots, candidates accept or ask for a new start, and everyone sees the same calendar.</p>
+        <div class="actions">
+            <a th:if="${currentRole == null}" class="btn btn-primary" th:href="@{/login}">Log in</a>
+            <a th:unless="${currentRole == null}" class="btn btn-primary" th:href="@{/dashboard}">Go to your dashboard</a>
+        </div>
+    </section>
+
+    <section class="features">
+        <div class="card feature">
+            <span class="role role-recruiter">Recruiter</span>
+            <h3>Match and confirm</h3>
+            <p>Run matching for one candidate or many, review the proposal, and confirm.</p>
+        </div>
+        <div class="card feature">
+            <span class="role role-candidate">Candidate</span>
+            <h3>Accept or reschedule</h3>
+            <p>Accept the slot, or request a different start on a weekday between 09:00 and 17:00 UTC.</p>
+        </div>
+        <div class="card feature">
+            <span class="role role-interviewer">Interviewer</span>
+            <h3>See your week</h3>
+            <p>A read-only calendar of booked interviews and free time.</p>
+        </div>
+        <div class="card feature">
+            <span class="role role-admin">Admin</span>
+            <h3>Manage people</h3>
+            <p>Create and edit users, and list every interview in the system.</p>
+        </div>
+    </section>
+</main>
 </body>
 </html>

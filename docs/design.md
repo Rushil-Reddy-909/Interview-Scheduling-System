@@ -1,6 +1,6 @@
 # Design
 
-Status: the `app_user` and `interview` tables are mapped, and startup seeds one admin when none exists. The matching flow below is designed but not implemented. Login and screens are not built yet.
+Status: the `app_user` and `interview` tables are mapped, and startup seeds one user for each role when that role is missing. Form login is in place: email and password, an HTTP session, and a landing page per role. The matching flow and the remaining screens are not built yet.
 
 ## Product
 
@@ -25,14 +25,14 @@ Spring Security form login with an HTTP session. There is no HTTP Basic auth and
 
 - The login page posts email and password. There is no signup.
 - Only an admin creates or changes users.
-- On an empty database, startup creates one admin from local config (`app.admin.email`, `app.admin.password`), so the first login is possible.
+- On startup, each missing role gets one user. The email is the role in lowercase plus `@localhost` (`admin@localhost`, `recruiter@localhost`, `candidate@localhost`, `interviewer@localhost`). The password comes from `app.admin.password` and is stored as a BCrypt hash. The local default is `12345678`.
 - Spring Security checks the BCrypt hash once, at login, and stores an `Authentication` in the HTTP session. That object carries the email and the role (`ADMIN`, `RECRUITER`, `CANDIDATE`, or `INTERVIEWER`).
 - Later requests restore that `Authentication` from the session cookie. They do not load the user again.
 - Pages and actions are allowed or refused from that role.
 - A role or password change applies on the user's next login. The current session keeps the previous role until then.
 - Logout ends the session.
 
-`spring-security-crypto` is already a dependency, for the password hash. The login build still has to add `spring-boot-starter-security` and the form-login configuration. None of that is implemented yet.
+`SecurityConfig` is the form-login filter. `AppUserDetailsService` loads the user by email at login and copies the stored BCrypt hash onto the `Authentication`. `User.roles` adds the `ROLE_` prefix. The login page is `GET /login`. After a successful login, admin goes to `/admin`, and the other roles go to `/dashboard/recruiter`, `/dashboard/candidate`, or `/dashboard/interviewer`. Those pages currently show the signed-in email, the role, and a logout form.
 
 ## Scheduling rules
 
@@ -186,13 +186,22 @@ Table details are in `docs/schema.md`.
 
 ## Screens
 
-Built later, in this order of need:
+Login is built: one Spring Security form for all roles, backed by a session. After login each role lands on its own dashboard.
 
-- **Login**: one Spring Security form for all roles, backed by a session.
-- **Recruiter scheduling**: pick candidates (or reschedule requests), an interviewer pool, a duration, and a date range. Then review the proposal and confirm. Single mode shows the top 5 options to choose from. Bulk mode shows one slot per candidate plus the unplaced list.
-- **Candidate dashboard**: upcoming interviews, accept, or request a new start.
-- **Interviewer calendar**: read-only view. Each cell shows "has an interview" or "free" (no interview in that range). Interviewers do not enter availability yet.
-- **Admin**: create and edit users, list all interviews.
+The UI for every screen is built (prompt 034), but it runs on sample data. `web/preview/PreviewData` holds in-memory users and interviews, and makes simple proposals on the 15-minute grid. It is not the matching service above. Every form action redirects back with a "preview only, nothing was saved" notice. Replace `PreviewData` with the real services and repositories when they are built.
+
+| Route | Role | Screen |
+| --- | --- | --- |
+| `/admin` | Admin | Users by role, interviews by status, next interviews |
+| `/admin/users` | Admin | Search and filter users. Add and edit users in dialogs |
+| `/admin/interviews` | Admin | All interviews, filtered by status, date range, and name |
+| `/dashboard/recruiter` | Recruiter | Status counts, reschedule requests, upcoming interviews |
+| `/dashboard/recruiter/schedule` | Recruiter | Pick candidates, a pool, a duration, and a range. Single mode shows the top 5 options. Bulk mode shows one slot per candidate plus the unplaced list |
+| `/dashboard/recruiter/reschedule` | Recruiter | Pick reschedule requests and extra interviewers. Options at the requested start come first |
+| `/dashboard/candidate` | Candidate | Upcoming interviews with accept and request new start, plus past interviews |
+| `/dashboard/interviewer` | Interviewer | Read-only week calendar ("has an interview" or free) and upcoming interviews |
+
+All pages share `templates/fragments/layout.html` (top bar, alerts, preview banner), `templates/fragments/ui.html` (status badge, role tag, person, slot), `static/css/app.css`, and `static/js/app.js` (dialogs and select-all).
 
 Thymeleaf renders the screens. Spring Validation checks forms on the server.
 

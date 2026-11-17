@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Reschedule requests')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: topbar('recruiter-reschedule')}"></header>
+<main class="page">
+    <div th:replace="~{fragments/layout :: flash}"></div>
+
+    <div class="page-header">
+        <div>
+            <h1>Reschedule requests</h1>
+            <p class="subtitle">Find a replacement for interviews whose candidate asked for a different start. The duration stays the same, and the current slot stays booked until you confirm.</p>
+        </div>
+    </div>
+
+    <div th:replace="~{fragments/layout :: preview-banner}"></div>
+
+    <div class="card" th:if="${requests.isEmpty()}">
+        <div class="empty">
+            <h3>No open requests</h3>
+            <p>When a candidate asks for a different start, it shows up here.</p>
+        </div>
+    </div>
+
+    <th:block th:unless="${requests.isEmpty()}">
+        <nav class="tabs" aria-label="Mode">
+            <a th:href="@{/dashboard/recruiter/reschedule(mode='single')}" th:classappend="${!bulk} ? 'active'">One request</a>
+            <a th:href="@{/dashboard/recruiter/reschedule(mode='bulk')}" th:classappend="${bulk} ? 'active'">Bulk</a>
+        </nav>
+
+        <div class="flash-area" th:if="${errors != null and !errors.isEmpty()}">
+            <div class="alert alert-error" role="alert">
+                <div>
+                    <strong>Fix these before matching:</strong>
+                    <ul><li th:each="message : ${errors}" th:text="${message}">Pick a reschedule request.</li></ul>
+                </div>
+            </div>
+        </div>
+
+        <form class="card" th:action="@{/dashboard/recruiter/reschedule}" method="get">
+            <input type="hidden" name="mode" th:value="${mode}">
+            <input type="hidden" name="propose" value="true">
+            <div class="card-head">
+                <div>
+                    <h2 th:text="${bulk} ? 'Requests to handle' : 'Request to handle'">Request to handle</h2>
+                    <p>The candidate's requested start ranks first when it is valid and someone in the pool is free then.</p>
+                </div>
+                <button th:if="${bulk}" class="link-button" type="button" data-check-all="interviewIds">Select all</button>
+            </div>
+            <div class="table-wrap">
+                <table class="table">
+                    <thead>
+                    <tr>
+                        <th></th>
+                        <th>Candidate</th>
+                        <th>Current interviewer</th>
+                        <th>Current slot</th>
+                        <th>Asked for</th>
+                        <th class="num">Duration</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="interview : ${requests}" class="is-selectable" data-select-row>
+                        <td>
+                            <input th:type="${bulk} ? 'checkbox' : 'radio'" name="interviewIds" th:value="${interview.id}"
+                                   th:checked="${#lists.contains(selectedInterviewIds, interview.id)}"
+                                   th:attr="aria-label='Select request from ' + ${interview.candidate.name}">
+                        </td>
+                        <td><div th:replace="~{fragments/ui :: person(${interview.candidate})}"></div></td>
+                        <td th:text="${interview.interviewer.name}">Interviewer</td>
+                        <td><span th:replace="~{fragments/ui :: slot(${interview.startsAt}, ${interview.endsAt()})}"></span></td>
+                        <td><span th:replace="~{fragments/ui :: slot(${interview.requestedStartsAt}, ${interview.requestedEndsAt()})}"></span></td>
+                        <td class="num" th:text="${interview.durationMinutes} + ' min'">60 min</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="card-body split">
+                <fieldset>
+                    <div class="legend-row">
+                        <legend>Add interviewers to the pool</legend>
+                        <button class="link-button" type="button" data-check-all="interviewerIds">Select all</button>
+                    </div>
+                    <div class="choice-list">
+                        <label class="choice" th:each="interviewer : ${interviewers}">
+                            <input type="checkbox" name="interviewerIds" th:value="${interviewer.id}"
+                                   th:checked="${#lists.contains(selectedInterviewerIds, interviewer.id)}">
+                            <span class="choice-main"><span th:replace="~{fragments/ui :: person(${interviewer})}"></span></span>
+                        </label>
+                    </div>
+                    <p class="hint below">Each request's current interviewer is always in its pool.</p>
+                </fieldset>
+                <div class="stack">
+                    <div class="form-grid">
+                        <div class="field">
+                            <label for="from">From</label>
+                            <input class="input" id="from" name="from" type="date" required th:value="${from}">
+                        </div>
+                        <div class="field">
+                            <label for="to">To</label>
+                            <input class="input" id="to" name="to" type="date" required th:value="${to}">
+                        </div>
+                        <span class="hint full">Weekends are skipped. Slots fall between 09:00 and 17:00 UTC.</span>
+                    </div>
+                    <div class="alert alert-info">
+                        <div>
+                            Options at the requested start come first: the current interviewer, then lower load, then lower id.
+                            Every other start follows, earliest first. The current interviewer wins only at an equal start.
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-foot">
+                <span class="subtle">Matching only proposes. The interview stays reschedule requested until you confirm.</span>
+                <button class="btn btn-primary" type="submit">Find replacement slots</button>
+            </div>
+        </form>
+
+        <section class="section" th:if="${proposed != null and !bulk}">
+            <form class="card" th:action="@{/dashboard/recruiter/reschedule/confirm}" method="post">
+                <input type="hidden" name="mode" value="single">
+                <div class="card-head">
+                    <div>
+                        <h2 th:text="'Replacement options for ' + ${rescheduleInterview.candidate.name}">Replacement options</h2>
+                        <p>
+                            Asked for <span th:replace="~{fragments/ui :: when(${rescheduleInterview.requestedStartsAt})}"></span>.
+                            <span th:unless="${requestUsable}">That start breaks the slot rules, so only other starts are shown.</span>
+                        </p>
+                    </div>
+                </div>
+                <div class="table-wrap" th:unless="${options.isEmpty()}">
+                    <table class="table">
+                        <thead>
+                        <tr>
+                            <th></th>
+                            <th>#</th>
+                            <th>Interviewer</th>
+                            <th>Slot</th>
+                            <th>Why</th>
+                            <th class="num">Load in range</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="option : ${options}" class="is-selectable" data-select-row>
+                            <td><input type="radio" name="option" th:value="${option.rank}" th:checked="${option.rank == 1}" required
+                                       th:attr="aria-label='Pick option ' + ${option.rank}"></td>
+                            <td><span class="rank" th:classappend="${option.rank == 1} ? 'is-best'" th:text="${option.rank}">1</span></td>
+                            <td><div th:replace="~{fragments/ui :: person(${option.interviewer})}"></div></td>
+                            <td><span th:replace="~{fragments/ui :: slot(${option.startsAt}, ${option.endsAt()})}"></span></td>
+                            <td>
+                                <span class="tag tag-purple" th:if="${option.requestedStart}">Requested start</span>
+                                <span class="tag" th:unless="${option.requestedStart}">Other start</span>
+                                <span class="tag tag-primary" th:if="${option.currentInterviewer}">Current interviewer</span>
+                            </td>
+                            <td class="num" th:text="${option.loadMinutes} + ' min booked'">60 min booked</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="empty" th:if="${options.isEmpty()}">
+                    <h3>No slot found</h3>
+                    <p>Nothing changes. The interview stays reschedule requested and its current slot stays booked.</p>
+                    <ul>
+                        <li>Widen the date range.</li>
+                        <li>Add interviewers to the pool.</li>
+                    </ul>
+                </div>
+                <div class="card-foot" th:unless="${options.isEmpty()}">
+                    <span class="subtle">On save the slot is replaced, the request is cleared, and the candidate must accept again.</span>
+                    <button class="btn btn-primary" type="submit">Save replacement</button>
+                </div>
+            </form>
+        </section>
+
+        <section class="section" th:if="${proposed != null and bulk}">
+            <form class="card" th:action="@{/dashboard/recruiter/reschedule/confirm}" method="post">
+                <input type="hidden" name="mode" value="bulk">
+                <input type="hidden" name="count" th:value="${bulkProposal.placed().size()}">
+                <div class="card-head">
+                    <div>
+                        <h2>Proposed replacements</h2>
+                        <p th:text="${bulkProposal.placed().size()} + ' placed, ' + ${bulkProposal.unplaced().size()} + ' unplaced.'">2 placed, 1 unplaced.</p>
+                    </div>
+                </div>
+                <div class="table-wrap" th:unless="${bulkProposal.placed().isEmpty()}">
+                    <table class="table">
+                        <thead>
+                        <tr>
+                            <th>Candidate</th>
+                            <th>Current slot</th>
+                            <th>New slot</th>
+                            <th>Interviewer</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="placement : ${bulkProposal.placed()}">
+                            <td><div th:replace="~{fragments/ui :: person(${placement.candidate()})}"></div></td>
+                            <td><span th:replace="~{fragments/ui :: slot(${placement.interview().startsAt}, ${placement.interview().endsAt()})}"></span></td>
+                            <td>
+                                <span th:replace="~{fragments/ui :: slot(${placement.option().startsAt()}, ${placement.option().endsAt()})}"></span>
+                                <div><span class="tag tag-purple" th:if="${placement.option().requestedStart()}">Requested start</span></div>
+                            </td>
+                            <td>
+                                <span th:text="${placement.option().interviewer().name}">Interviewer</span>
+                                <span class="tag" th:if="${placement.interviewerChanged()}">Changed</span>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-body" th:unless="${bulkProposal.unplaced().isEmpty()}">
+                    <div class="alert alert-warning">
+                        <div>
+                            <strong>Unplaced requests</strong>
+                            <ul>
+                                <li th:each="miss : ${bulkProposal.unplaced()}">
+                                    <span th:text="${miss.candidate().name}">Name</span>:
+                                    <span th:text="${miss.reason()}">Nothing free.</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="empty" th:if="${bulkProposal.placed().isEmpty()}">
+                    <h3>No replacements found</h3>
+                    <p>Widen the date range or add interviewers to the pool.</p>
+                </div>
+                <div class="card-foot">
+                    <span class="subtle">Confirm saves every replacement or none. Each returns to Awaiting candidate.</span>
+                    <button class="btn btn-primary" type="submit" th:disabled="${bulkProposal.placed().isEmpty()}"
+                            th:text="'Save ' + ${bulkProposal.placed().size()} + ' replacements'">Save replacements</button>
+                </div>
+            </form>
+        </section>
+    </th:block>
+</main>
+</body>
+</html>

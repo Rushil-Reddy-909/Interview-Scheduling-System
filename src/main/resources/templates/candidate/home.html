@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('My interviews')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: topbar('candidate-home')}"></header>
+<main class="page">
+    <div th:replace="~{fragments/layout :: flash}"></div>
+
+    <div class="page-header">
+        <div>
+            <h1>My interviews</h1>
+            <p class="subtitle">Accept a slot, or ask for a different start. All times are UTC.</p>
+        </div>
+    </div>
+
+    <div th:replace="~{fragments/layout :: preview-banner}"></div>
+
+    <section>
+        <div class="section-head">
+            <h2>Upcoming</h2>
+            <p th:text="${upcoming.size()} + ' interviews'">3 interviews</p>
+        </div>
+
+        <div class="stack" th:unless="${upcoming.isEmpty()}">
+            <article class="card interview-card" th:each="interview : ${upcoming}">
+                <div class="date-tile">
+                    <span class="dow" th:text="${#temporals.format(interview.startsAt, 'EEE')}">Tue</span>
+                    <span class="day" th:text="${#temporals.format(interview.startsAt, 'd')}">24</span>
+                    <span class="month" th:text="${#temporals.format(interview.startsAt, 'MMM yyyy')}">Nov 2026</span>
+                </div>
+
+                <div class="interview-main">
+                    <div class="interview-title">
+                        <h3 th:text="'Interview with ' + ${interview.interviewer.name}">Interview with Marcus Lee</h3>
+                        <span th:replace="~{fragments/ui :: status(${interview.status})}"></span>
+                    </div>
+                    <div class="meta">
+                        <span th:text="${#temporals.format(interview.startsAt, 'HH:mm')} + '–' + ${#temporals.format(interview.endsAt(), 'HH:mm')} + ' UTC'">10:00–11:00 UTC</span>
+                        <span th:text="${interview.durationMinutes} + ' minutes'">60 minutes</span>
+                        <span th:text="'Scheduled by ' + ${interview.recruiter.name}">Scheduled by Priya Raman</span>
+                    </div>
+                    <div class="callout" th:if="${interview.status.name() == 'RESCHEDULE_REQUESTED'}">
+                        You asked for <strong th:text="${#temporals.format(interview.requestedStartsAt, 'EEE d MMM, HH:mm')} + ' UTC'">Wed 25 Nov, 15:00 UTC</strong>.
+                        Your current slot stays booked until the recruiter confirms a replacement.
+                    </div>
+                    <p class="subtle" th:if="${interview.status.name() == 'AWAITING_CANDIDATE'}">The recruiter is waiting for your answer.</p>
+                </div>
+
+                <div class="interview-actions">
+                    <form th:if="${interview.canAccept()}" class="inline-form"
+                          th:action="@{/dashboard/candidate/interviews/{id}/accept(id=${interview.id})}" method="post">
+                        <button class="btn btn-success" type="submit">Accept</button>
+                    </form>
+                    <button th:if="${interview.canRequestNewStart()}" class="btn btn-secondary" type="button"
+                            th:attr="data-dialog-open='request-' + ${interview.id}">Request new start</button>
+                </div>
+
+                <dialog th:if="${interview.canRequestNewStart()}" th:id="'request-' + ${interview.id}" class="modal"
+                        th:attr="aria-labelledby='request-title-' + ${interview.id}">
+                    <form th:action="@{/dashboard/candidate/interviews/{id}/request-new-start(id=${interview.id})}" method="post">
+                        <div class="modal-head">
+                            <div>
+                                <h2 th:id="'request-title-' + ${interview.id}">Request a new start</h2>
+                                <p th:text="'Currently ' + ${#temporals.format(interview.startsAt, 'EEE d MMM, HH:mm')} + ' UTC with ' + ${interview.interviewer.name} + '.'">Currently Tue 24 Nov, 10:00 UTC.</p>
+                            </div>
+                            <button class="modal-close" type="button" data-dialog-close aria-label="Close">&times;</button>
+                        </div>
+                        <div class="modal-body form-grid">
+                            <div class="field">
+                                <label th:for="'date-' + ${interview.id}">Date</label>
+                                <input class="input" th:id="'date-' + ${interview.id}" name="date" type="date" required th:min="${today}">
+                                <span class="hint">Monday to Friday.</span>
+                            </div>
+                            <div class="field">
+                                <label th:for="'time-' + ${interview.id}">Start (UTC)</label>
+                                <select class="select" th:id="'time-' + ${interview.id}" name="time" required>
+                                    <option th:each="time : ${interview.requestableStarts()}" th:value="${time}"
+                                            th:text="${#temporals.format(time, 'HH:mm')}">09:00</option>
+                                </select>
+                                <span class="hint" th:text="'It lasts ' + ${interview.durationMinutes} + ' minutes and must end by 17:00.'">It lasts 60 minutes.</span>
+                            </div>
+                            <div class="alert alert-info full">
+                                <div>The recruiter looks for a replacement. Your current slot stays booked until they confirm, and you then accept the new slot.</div>
+                            </div>
+                        </div>
+                        <div class="modal-foot">
+                            <button class="btn btn-secondary" type="button" data-dialog-close>Cancel</button>
+                            <button class="btn btn-primary" type="submit">Send request</button>
+                        </div>
+                    </form>
+                </dialog>
+            </article>
+        </div>
+
+        <div class="card" th:if="${upcoming.isEmpty()}">
+            <div class="empty">
+                <h3>No upcoming interviews</h3>
+                <p>A recruiter will schedule one. It appears here for you to accept.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="section" th:unless="${past.isEmpty()}">
+        <div class="card">
+            <div class="card-head">
+                <div>
+                    <h2>Past interviews</h2>
+                    <p>Interviews that have already ended.</p>
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table class="table">
+                    <thead>
+                    <tr>
+                        <th>Interviewer</th>
+                        <th>Slot</th>
+                        <th class="num">Duration</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="interview : ${past}">
+                        <td th:text="${interview.interviewer.name}">Interviewer</td>
+                        <td><span th:replace="~{fragments/ui :: slot(${interview.startsAt}, ${interview.endsAt()})}"></span></td>
+                        <td class="num" th:text="${interview.durationMinutes} + ' min'">60 min</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+</main>
+</body>
+</html>
