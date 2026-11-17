@@ -3,6 +3,7 @@ package com.interviewscheduling.domain;
 import java.time.Instant;
 
 import com.interviewscheduling.enums.InterviewStatus;
+import com.interviewscheduling.exception.InvalidInterviewStateException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -74,6 +75,35 @@ public class Interview {
 	@PreUpdate
 	void onUpdate() {
 		updatedAt = Instant.now();
+	}
+
+	public boolean hasStarted(Instant now) {
+		return !startsAt.isAfter(now);
+	}
+
+	public void accept(Instant now) {
+		if (status != InterviewStatus.AWAITING_CANDIDATE) {
+			throw new InvalidInterviewStateException("Only an interview that is awaiting your answer can be accepted.");
+		}
+		if (hasStarted(now)) {
+			throw new InvalidInterviewStateException("This interview has already started.");
+		}
+		status = InterviewStatus.ACCEPTED;
+	}
+
+	/**
+	 * Records the candidate's preferred start. The current slot stays booked until the recruiter replaces it.
+	 */
+	public void requestNewStart(Instant start, Instant now) {
+		if (status != InterviewStatus.AWAITING_CANDIDATE && status != InterviewStatus.ACCEPTED) {
+			throw new InvalidInterviewStateException(
+					"A new start can be requested only while the interview is awaiting your answer or accepted.");
+		}
+		if (hasStarted(now)) {
+			throw new InvalidInterviewStateException("This interview has already started.");
+		}
+		requestedStartsAt = start;
+		status = InterviewStatus.RESCHEDULE_REQUESTED;
 	}
 
 	public Long getId() {

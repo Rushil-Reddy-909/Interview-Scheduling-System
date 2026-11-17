@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Something went wrong')}"></head>
+<body>
+<main class="auth-shell">
+    <div class="auth-card">
+        <a class="brand" th:href="@{/dashboard}">
+            <span class="brand-mark">IS</span>
+            <span>Interview Scheduling</span>
+        </a>
+        <div class="card card-body">
+            <h1 th:switch="${status}">
+                <th:block th:case="404">Page not found</th:block>
+                <th:block th:case="403">Not allowed</th:block>
+                <th:block th:case="400">That request did not make sense</th:block>
+                <th:block th:case="*">Something went wrong</th:block>
+            </h1>
+            <p class="lead" th:switch="${status}">
+                <th:block th:case="404">The page you asked for does not exist.</th:block>
+                <th:block th:case="403">Your role cannot open this page.</th:block>
+                <th:block th:case="400">Check the link or the form values and try again.</th:block>
+                <th:block th:case="*">The server could not finish the request. Try again in a moment.</th:block>
+            </p>
+            <p class="subtle" th:if="${status != null}" th:text="'Error ' + ${status}">Error 500</p>
+            <a class="btn btn-primary btn-block" th:href="@{/dashboard}">Back to my dashboard</a>
+        </div>
+    </div>
+</main>
+</body>
+</html>

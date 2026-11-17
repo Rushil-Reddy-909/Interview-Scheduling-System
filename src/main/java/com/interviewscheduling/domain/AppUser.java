@@ -2,6 +2,7 @@ package com.interviewscheduling.domain;
 
 import java.time.Instant;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.interviewscheduling.enums.UserRole;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

@@ -58,13 +58,19 @@ Open <http://localhost:8080/login>. Sign in with one of the seeded emails and th
 
 Each role lands on its own dashboard. Logout is the button in the top bar. It ends the session.
 
-The dashboards show sample data from `web/preview/PreviewData`. Form actions only show a notice. Nothing is saved yet.
+The dashboards read and write the database. Admins manage users. Candidates accept interviews or request a new start. Recruiter matching is not built yet, so the schedule and reschedule pages stop after checking their inputs.
+
+## Demo data
+
+With `app.seed.demo=true` (the local default), startup also inserts sample recruiters, candidates, interviewers, and interviews around next Monday. It runs only while the `interview` table is empty, and it reuses the four `role@localhost` accounts. New sample users get the `app.admin.password` password. Set `app.seed.demo=false` to start without them. Tests always run with it off.
 
 ## Tests
 
 ```bash
-./mvnw test
+./mvnw clean test
 ```
+
+Tests use an in-memory H2 database and a fixed clock (Monday 23 November 2026, 08:00 UTC) from `TestClockConfiguration`. Run `clean` after moving classes, so stale files in `target/classes` do not create duplicate beans.
 
 ## Project docs
 
@@ -78,16 +84,22 @@ The dashboards show sample data from `web/preview/PreviewData`. Form actions onl
 ## Layout
 
 ```text
-src/main/java/com/interviewscheduling/            application entry point
-src/main/java/com/interviewscheduling/domain/      JPA entities for users and interviews
-src/main/java/com/interviewscheduling/enums/       role and interview status
-src/main/java/com/interviewscheduling/repository/  Spring Data repositories
-src/main/java/com/interviewscheduling/security/    form login and session
-src/main/java/com/interviewscheduling/seed/        bootstrap users
-src/main/java/com/interviewscheduling/web/         page controllers
-src/main/java/com/interviewscheduling/web/preview/ sample data for the dashboards, until services exist
-src/main/resources/templates/fragments/           shared layout and UI fragments
-src/main/resources/templates/                     pages for home, login, admin, recruiter, candidate, interviewer
-src/main/resources/static/                        app.css and app.js
-src/main/resources/application.properties         local H2, JPA, and admin seed settings
+src/main/java/com/interviewscheduling/                application entry point
+src/main/java/com/interviewscheduling/config/         UTC clock bean
+src/main/java/com/interviewscheduling/domain/         JPA entities and interview status transitions
+src/main/java/com/interviewscheduling/enums/          role and interview status
+src/main/java/com/interviewscheduling/exception/      DomainException and its subclasses
+src/main/java/com/interviewscheduling/repository/     Spring Data repositories
+src/main/java/com/interviewscheduling/service/        user, interview, and calendar services, and slot rules
+src/main/java/com/interviewscheduling/dto/            view records the services return to pages
+src/main/java/com/interviewscheduling/security/       form login and session
+src/main/java/com/interviewscheduling/seed/           bootstrap users and demo data
+src/main/java/com/interviewscheduling/web/controller/ page controllers
+src/main/java/com/interviewscheduling/web/advice/     current user and error-to-flash handling
+src/main/java/com/interviewscheduling/web/form/       validated form objects
+src/main/java/com/interviewscheduling/web/model/      page-only records
+src/main/resources/templates/fragments/              shared layout and UI fragments
+src/main/resources/templates/                        pages for home, login, error, admin, recruiter, candidate, interviewer
+src/main/resources/static/                           app.css and app.js
+src/main/resources/application.properties            local H2, JPA, admin seed, and demo seed settings
 ```

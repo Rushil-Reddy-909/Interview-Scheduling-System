@@ -13,8 +13,6 @@
         </div>
     </div>
 
-    <div th:replace="~{fragments/layout :: preview-banner}"></div>
-
     <nav class="tabs" aria-label="Mode">
         <a th:href="@{/dashboard/recruiter/schedule(mode='single')}" th:classappend="${!bulk} ? 'active'">One candidate</a>
         <a th:href="@{/dashboard/recruiter/schedule(mode='bulk')}" th:classappend="${bulk} ? 'active'">Bulk</a>
@@ -92,108 +90,13 @@
         </div>
     </form>
 
-    <section class="section" th:if="${proposed != null and !bulk}">
-        <form class="card" th:action="@{/dashboard/recruiter/schedule/confirm}" method="post">
-            <input type="hidden" name="mode" value="single">
-            <div class="card-head">
-                <div>
-                    <h2 th:text="'Top options for ' + ${proposalCandidate.name}">Top options</h2>
-                    <p>Earliest start first, then the interviewer with fewer booked minutes, then the lower id.</p>
-                </div>
+    <section class="section" th:if="${matchingPending}">
+        <div class="card">
+            <div class="empty">
+                <h3>Matching is not built yet</h3>
+                <p>Your choices are valid and kept in the form. Slot proposals and confirm come with the matching service.</p>
             </div>
-            <div class="table-wrap" th:unless="${options.isEmpty()}">
-                <table class="table">
-                    <thead>
-                    <tr>
-                        <th></th>
-                        <th>#</th>
-                        <th>Interviewer</th>
-                        <th>Slot</th>
-                        <th class="num">Load in range</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <tr th:each="option : ${options}" class="is-selectable" data-select-row>
-                        <td><input type="radio" name="option" th:value="${option.rank}" th:checked="${option.rank == 1}" required
-                                   th:attr="aria-label='Pick option ' + ${option.rank}"></td>
-                        <td><span class="rank" th:classappend="${option.rank == 1} ? 'is-best'" th:text="${option.rank}">1</span></td>
-                        <td><div th:replace="~{fragments/ui :: person(${option.interviewer})}"></div></td>
-                        <td><span th:replace="~{fragments/ui :: slot(${option.startsAt}, ${option.endsAt()})}"></span></td>
-                        <td class="num" th:text="${option.loadMinutes} + ' min booked'">60 min booked</td>
-                    </tr>
-                    </tbody>
-                </table>
-            </div>
-            <div class="empty" th:if="${options.isEmpty()}">
-                <h3>No slot found</h3>
-                <p>No interviewer in the pool shares a free gap with this candidate.</p>
-                <ul>
-                    <li>Widen the date range.</li>
-                    <li>Add interviewers to the pool.</li>
-                    <li>Shorten the duration.</li>
-                </ul>
-            </div>
-            <div class="card-foot" th:unless="${options.isEmpty()}">
-                <span class="subtle">Confirm rechecks the slot. If someone was booked meanwhile, nothing is saved and you run matching again.</span>
-                <button class="btn btn-primary" type="submit">Confirm and create interview</button>
-            </div>
-        </form>
-    </section>
-
-    <section class="section" th:if="${proposed != null and bulk}">
-        <form class="card" th:action="@{/dashboard/recruiter/schedule/confirm}" method="post">
-            <input type="hidden" name="mode" value="bulk">
-            <input type="hidden" name="count" th:value="${bulkProposal.placed().size()}">
-            <div class="card-head">
-                <div>
-                    <h2>Proposed slots</h2>
-                    <p th:text="${bulkProposal.placed().size()} + ' placed, ' + ${bulkProposal.unplaced().size()} + ' unplaced. Most constrained candidates were placed first.'">3 placed, 1 unplaced.</p>
-                </div>
-            </div>
-            <div class="table-wrap" th:unless="${bulkProposal.placed().isEmpty()}">
-                <table class="table">
-                    <thead>
-                    <tr>
-                        <th>Candidate</th>
-                        <th>Interviewer</th>
-                        <th>Slot</th>
-                        <th class="num">Load in range</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <tr th:each="placement : ${bulkProposal.placed()}">
-                        <td><div th:replace="~{fragments/ui :: person(${placement.candidate()})}"></div></td>
-                        <td th:text="${placement.option().interviewer().name}">Interviewer</td>
-                        <td><span th:replace="~{fragments/ui :: slot(${placement.option().startsAt()}, ${placement.option().endsAt()})}"></span></td>
-                        <td class="num" th:text="${placement.option().loadMinutes()} + ' min booked'">60 min booked</td>
-                    </tr>
-                    </tbody>
-                </table>
-            </div>
-            <div class="card-body" th:unless="${bulkProposal.unplaced().isEmpty()}">
-                <div class="alert alert-warning">
-                    <div>
-                        <strong>Unplaced candidates</strong>
-                        <ul>
-                            <li th:each="miss : ${bulkProposal.unplaced()}">
-                                <span th:text="${miss.candidate().name}">Name</span>:
-                                <span th:text="${miss.reason()}">No common free gap.</span>
-                            </li>
-                        </ul>
-                        <p class="below">No interview is created for them. Widen the range, add interviewers, or stop here.</p>
-                    </div>
-                </div>
-            </div>
-            <div class="empty" th:if="${bulkProposal.placed().isEmpty()}">
-                <h3>Nobody could be placed</h3>
-                <p>Widen the date range or add interviewers to the pool.</p>
-            </div>
-            <div class="card-foot">
-                <span class="subtle">Confirm saves every slot or none. A conflict names the slot, and you run matching again.</span>
-                <button class="btn btn-primary" type="submit" th:disabled="${bulkProposal.placed().isEmpty()}"
-                        th:text="'Confirm ' + ${bulkProposal.placed().size()} + ' interviews'">Confirm interviews</button>
-            </div>
-        </form>
+        </div>
     </section>
 </main>
 </body>

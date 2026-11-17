@@ -19,8 +19,6 @@
         </div>
     </div>
 
-    <div th:replace="~{fragments/layout :: preview-banner}"></div>
-
     <div class="stats">
         <a th:each="stat : ${stats}" class="stat" th:classappend="'tone-' + ${stat.tone}" th:href="${stat.href}">
             <span class="stat-label" th:text="${stat.label}">Awaiting candidate</span>

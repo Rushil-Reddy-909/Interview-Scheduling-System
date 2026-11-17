@@ -1,9 +1,6 @@
-package com.interviewscheduling.web;
+package com.interviewscheduling.web.controller;
 
-import java.time.DayOfWeek;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.temporal.TemporalAdjusters;
 
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.Authentication;
@@ -13,16 +10,16 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
-import com.interviewscheduling.web.preview.PreviewData;
+import com.interviewscheduling.service.InterviewerCalendarService;
 
 @Controller
 @RequestMapping("/dashboard/interviewer")
 public class InterviewerController {
 
-	private final PreviewData data;
+	private final InterviewerCalendarService calendar;
 
-	public InterviewerController(PreviewData data) {
-		this.data = data;
+	public InterviewerController(InterviewerCalendarService calendar) {
+		this.calendar = calendar;
 	}
 
 	@GetMapping
@@ -30,12 +27,10 @@ public class InterviewerController {
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate week,
 			Model model) {
 		String email = authentication.getName();
-		LocalDateTime now = data.now();
-		LocalDate shown = week == null ? data.weekOfNextInterview(email) : week;
-		model.addAttribute("calendar", data.weekCalendar(email, shown));
-		model.addAttribute("thisWeek", now.toLocalDate().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)));
-		model.addAttribute("upcoming",
-				data.forInterviewer(email).stream().filter(interview -> interview.endsAt().isAfter(now)).toList());
+		LocalDate shown = week == null ? calendar.weekOfNextInterview(email) : week;
+		model.addAttribute("calendar", calendar.week(email, shown));
+		model.addAttribute("thisWeek", calendar.thisWeek());
+		model.addAttribute("upcoming", calendar.upcoming(email));
 		return "interviewer/home";
 	}
 

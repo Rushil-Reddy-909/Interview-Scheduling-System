@@ -52,11 +52,5 @@
 </header>
 
 <div th:fragment="flash" class="flash-area"><div class="alert alert-success" role="status" th:if="${notice}" th:text="${notice}">Saved.</div><div class="alert alert-error" role="alert" th:if="${error}" th:text="${error}">Something went wrong.</div></div>
-
-<div th:fragment="preview-banner" class="preview-banner">
-    <strong>Preview</strong>
-    <span>Sample data only. Actions show a notice and are not saved until the scheduling services are built.</span>
-</div>
-
 </body>
 </html>

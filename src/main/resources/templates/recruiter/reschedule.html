@@ -13,8 +13,6 @@
         </div>
     </div>
 
-    <div th:replace="~{fragments/layout :: preview-banner}"></div>
-
     <div class="card" th:if="${requests.isEmpty()}">
         <div class="empty">
             <h3>No open requests</h3>
@@ -116,121 +114,13 @@
             </div>
         </form>
 
-        <section class="section" th:if="${proposed != null and !bulk}">
-            <form class="card" th:action="@{/dashboard/recruiter/reschedule/confirm}" method="post">
-                <input type="hidden" name="mode" value="single">
-                <div class="card-head">
-                    <div>
-                        <h2 th:text="'Replacement options for ' + ${rescheduleInterview.candidate.name}">Replacement options</h2>
-                        <p>
-                            Asked for <span th:replace="~{fragments/ui :: when(${rescheduleInterview.requestedStartsAt})}"></span>.
-                            <span th:unless="${requestUsable}">That start breaks the slot rules, so only other starts are shown.</span>
-                        </p>
-                    </div>
+        <section class="section" th:if="${matchingPending}">
+            <div class="card">
+                <div class="empty">
+                    <h3>Matching is not built yet</h3>
+                    <p>Your choices are valid and kept in the form. Nothing changes: each interview stays reschedule requested and keeps its current slot.</p>
                 </div>
-                <div class="table-wrap" th:unless="${options.isEmpty()}">
-                    <table class="table">
-                        <thead>
-                        <tr>
-                            <th></th>
-                            <th>#</th>
-                            <th>Interviewer</th>
-                            <th>Slot</th>
-                            <th>Why</th>
-                            <th class="num">Load in range</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr th:each="option : ${options}" class="is-selectable" data-select-row>
-                            <td><input type="radio" name="option" th:value="${option.rank}" th:checked="${option.rank == 1}" required
-                                       th:attr="aria-label='Pick option ' + ${option.rank}"></td>
-                            <td><span class="rank" th:classappend="${option.rank == 1} ? 'is-best'" th:text="${option.rank}">1</span></td>
-                            <td><div th:replace="~{fragments/ui :: person(${option.interviewer})}"></div></td>
-                            <td><span th:replace="~{fragments/ui :: slot(${option.startsAt}, ${option.endsAt()})}"></span></td>
-                            <td>
-                                <span class="tag tag-purple" th:if="${option.requestedStart}">Requested start</span>
-                                <span class="tag" th:unless="${option.requestedStart}">Other start</span>
-                                <span class="tag tag-primary" th:if="${option.currentInterviewer}">Current interviewer</span>
-                            </td>
-                            <td class="num" th:text="${option.loadMinutes} + ' min booked'">60 min booked</td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </div>
-                <div class="empty" th:if="${options.isEmpty()}">
-                    <h3>No slot found</h3>
-                    <p>Nothing changes. The interview stays reschedule requested and its current slot stays booked.</p>
-                    <ul>
-                        <li>Widen the date range.</li>
-                        <li>Add interviewers to the pool.</li>
-                    </ul>
-                </div>
-                <div class="card-foot" th:unless="${options.isEmpty()}">
-                    <span class="subtle">On save the slot is replaced, the request is cleared, and the candidate must accept again.</span>
-                    <button class="btn btn-primary" type="submit">Save replacement</button>
-                </div>
-            </form>
-        </section>
-
-        <section class="section" th:if="${proposed != null and bulk}">
-            <form class="card" th:action="@{/dashboard/recruiter/reschedule/confirm}" method="post">
-                <input type="hidden" name="mode" value="bulk">
-                <input type="hidden" name="count" th:value="${bulkProposal.placed().size()}">
-                <div class="card-head">
-                    <div>
-                        <h2>Proposed replacements</h2>
-                        <p th:text="${bulkProposal.placed().size()} + ' placed, ' + ${bulkProposal.unplaced().size()} + ' unplaced.'">2 placed, 1 unplaced.</p>
-                    </div>
-                </div>
-                <div class="table-wrap" th:unless="${bulkProposal.placed().isEmpty()}">
-                    <table class="table">
-                        <thead>
-                        <tr>
-                            <th>Candidate</th>
-                            <th>Current slot</th>
-                            <th>New slot</th>
-                            <th>Interviewer</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr th:each="placement : ${bulkProposal.placed()}">
-                            <td><div th:replace="~{fragments/ui :: person(${placement.candidate()})}"></div></td>
-                            <td><span th:replace="~{fragments/ui :: slot(${placement.interview().startsAt}, ${placement.interview().endsAt()})}"></span></td>
-                            <td>
-                                <span th:replace="~{fragments/ui :: slot(${placement.option().startsAt()}, ${placement.option().endsAt()})}"></span>
-                                <div><span class="tag tag-purple" th:if="${placement.option().requestedStart()}">Requested start</span></div>
-                            </td>
-                            <td>
-                                <span th:text="${placement.option().interviewer().name}">Interviewer</span>
-                                <span class="tag" th:if="${placement.interviewerChanged()}">Changed</span>
-                            </td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </div>
-                <div class="card-body" th:unless="${bulkProposal.unplaced().isEmpty()}">
-                    <div class="alert alert-warning">
-                        <div>
-                            <strong>Unplaced requests</strong>
-                            <ul>
-                                <li th:each="miss : ${bulkProposal.unplaced()}">
-                                    <span th:text="${miss.candidate().name}">Name</span>:
-                                    <span th:text="${miss.reason()}">Nothing free.</span>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-                <div class="empty" th:if="${bulkProposal.placed().isEmpty()}">
-                    <h3>No replacements found</h3>
-                    <p>Widen the date range or add interviewers to the pool.</p>
-                </div>
-                <div class="card-foot">
-                    <span class="subtle">Confirm saves every replacement or none. Each returns to Awaiting candidate.</span>
-                    <button class="btn btn-primary" type="submit" th:disabled="${bulkProposal.placed().isEmpty()}"
-                            th:text="'Save ' + ${bulkProposal.placed().size()} + ' replacements'">Save replacements</button>
-                </div>
-            </form>
+            </div>
         </section>
     </th:block>
 </main>

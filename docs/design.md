@@ -1,6 +1,6 @@
 # Design
 
-Status: the `app_user` and `interview` tables are mapped, and startup seeds one user for each role when that role is missing. Form login is in place: email and password, an HTTP session, and a landing page per role. The matching flow and the remaining screens are not built yet.
+Status: the `app_user` and `interview` tables are mapped, and startup seeds one user for each role when that role is missing. Form login is in place: email and password, an HTTP session, and a landing page per role. Every screen runs on the database through services (prompt 036). Admins manage real users. Candidates accept or request a new start, and those changes are saved. Matching, confirm, and replacement saves are not built yet. They are the next plan.
 
 ## Product
 
@@ -27,12 +27,12 @@ Spring Security form login with an HTTP session. There is no HTTP Basic auth and
 - Only an admin creates or changes users.
 - On startup, each missing role gets one user. The email is the role in lowercase plus `@localhost` (`admin@localhost`, `recruiter@localhost`, `candidate@localhost`, `interviewer@localhost`). The password comes from `app.admin.password` and is stored as a BCrypt hash. The local default is `12345678`.
 - Spring Security checks the BCrypt hash once, at login, and stores an `Authentication` in the HTTP session. That object carries the email and the role (`ADMIN`, `RECRUITER`, `CANDIDATE`, or `INTERVIEWER`).
-- Later requests restore that `Authentication` from the session cookie. They do not load the user again.
+- Later requests restore that `Authentication` from the session cookie. They do not load the user again for authorization. The top bar reads only the display name from the database.
 - Pages and actions are allowed or refused from that role.
 - A role or password change applies on the user's next login. The current session keeps the previous role until then.
 - Logout ends the session.
 
-`SecurityConfig` is the form-login filter. `AppUserDetailsService` loads the user by email at login and copies the stored BCrypt hash onto the `Authentication`. `User.roles` adds the `ROLE_` prefix. The login page is `GET /login`. After a successful login, admin goes to `/admin`, and the other roles go to `/dashboard/recruiter`, `/dashboard/candidate`, or `/dashboard/interviewer`. Those pages currently show the signed-in email, the role, and a logout form.
+`SecurityConfig` is the form-login filter. `AppUserDetailsService` loads the user by email at login and copies the stored BCrypt hash onto the `Authentication`. `User.roles` adds the `ROLE_` prefix. The login page is `GET /login`. After a successful login, admin goes to `/admin`, and the other roles go to `/dashboard/recruiter`, `/dashboard/candidate`, or `/dashboard/interviewer`.
 
 ## Scheduling rules
 
@@ -188,7 +188,14 @@ Table details are in `docs/schema.md`.
 
 Login is built: one Spring Security form for all roles, backed by a session. After login each role lands on its own dashboard.
 
-The UI for every screen is built (prompt 034), but it runs on sample data. `web/preview/PreviewData` holds in-memory users and interviews, and makes simple proposals on the 15-minute grid. It is not the matching service above. Every form action redirects back with a "preview only, nothing was saved" notice. Replace `PreviewData` with the real services and repositories when they are built.
+The UI for every screen was built on sample data in prompt 034. Prompt 036 removed that sample data, and every screen now reads and writes the database through services:
+
+- Admin user forms create and edit users, with the rules in [Error handling](#error-handling).
+- The candidate's accept and request-new-start forms save the change.
+- The interviewer calendar shows the stored interviews.
+- The recruiter schedule and reschedule pages list real candidates, interviewers, and requests, and they check the inputs. Valid input then shows "Matching is not built yet". There are no confirm endpoints yet. The proposal tables from prompt 034 were removed from the templates. Git history (commit `43f2033`) has them for the matching plan.
+
+For local use, `app.seed.demo=true` inserts sample people and interviews around next Monday, only while the `interview` table is empty. Tests set it to `false` and build their own rows.
 
 | Route | Role | Screen |
 | --- | --- | --- |
@@ -196,14 +203,57 @@ The UI for every screen is built (prompt 034), but it runs on sample data. `web/
 | `/admin/users` | Admin | Search and filter users. Add and edit users in dialogs |
 | `/admin/interviews` | Admin | All interviews, filtered by status, date range, and name |
 | `/dashboard/recruiter` | Recruiter | Status counts, reschedule requests, upcoming interviews |
-| `/dashboard/recruiter/schedule` | Recruiter | Pick candidates, a pool, a duration, and a range. Single mode shows the top 5 options. Bulk mode shows one slot per candidate plus the unplaced list |
-| `/dashboard/recruiter/reschedule` | Recruiter | Pick reschedule requests and extra interviewers. Options at the requested start come first |
+| `/dashboard/recruiter/schedule` | Recruiter | Pick candidates, a pool, a duration, and a range. Input errors are listed. Valid input shows "Matching is not built yet" |
+| `/dashboard/recruiter/reschedule` | Recruiter | Pick reschedule requests and extra interviewers. Same input checks and not-built-yet state |
 | `/dashboard/candidate` | Candidate | Upcoming interviews with accept and request new start, plus past interviews |
 | `/dashboard/interviewer` | Interviewer | Read-only week calendar ("has an interview" or free) and upcoming interviews |
 
-All pages share `templates/fragments/layout.html` (top bar, alerts, preview banner), `templates/fragments/ui.html` (status badge, role tag, person, slot), `static/css/app.css`, and `static/js/app.js` (dialogs and select-all).
+All pages share `templates/fragments/layout.html` (top bar and alerts), `templates/fragments/ui.html` (status badge, role tag, person, slot), `static/css/app.css`, and `static/js/app.js` (dialogs and select-all). `templates/error.html` is the page for unhandled errors such as 404.
 
 Thymeleaf renders the screens. Spring Validation checks forms on the server.
+
+## Code layout
+
+Packages under `com.interviewscheduling`:
+
+| Package | Holds |
+| --- | --- |
+| `config` | `TimeConfig`, the UTC `Clock` bean. Services read the time only from it, so tests can fix it |
+| `domain` | JPA entities. `Interview.accept` and `Interview.requestNewStart` guard the status transitions |
+| `enums` | `UserRole`, `InterviewStatus` |
+| `exception` | `DomainException` and its subclasses |
+| `repository` | Spring Data repositories. Dashboard queries fetch the three people in the same query with `@EntityGraph` |
+| `service` | `UserService`, `InterviewService`, `InterviewerCalendarService`, `SlotRules` |
+| `dto` | `UserView`, `InterviewView` (UTC `LocalDateTime`), `WeekCalendar`. Services return these, never entities, because `open-in-view` is off |
+| `security` | Form login and the session |
+| `seed` | Per-role users (`AdminSeedConfiguration`, order 0) and demo data (`DemoDataSeeder`, order 1) |
+| `web.controller` | Page controllers. They call services and add view objects to the model |
+| `web.advice` | `CurrentAccountAdvice` (top-bar user) and `DomainExceptionAdvice` |
+| `web.form` | `CreateUserForm`, `UpdateUserForm`, `NewStartForm`, checked with `@Validated` |
+| `web.model` | Page-only records such as `StatCard` |
+
+`SlotRules` holds the weekday, working-window, 15-minute-grid, and future checks. Matching will reuse it.
+
+## Error handling
+
+A broken rule throws a subclass of `DomainException`. Its message is written for the user:
+
+| Exception | When |
+| --- | --- |
+| `NotFoundException` | The interview or user does not exist, or the interview belongs to another candidate |
+| `SlotRejectedException` | A slot breaks a rule. Each rule has its own message, such as "Pick a weekday" or "Start on a quarter hour" |
+| `InvalidInterviewStateException` | The status does not allow the action, or the interview has started |
+| `DuplicateEmailException` | Another user has that email |
+| `UserChangeRejectedException` | The password is not 8 to 72 characters, the last admin would lose the role, or a user on any interview would change role |
+
+`DomainExceptionAdvice` catches these and form validation errors. It redirects to the page the form was posted from (the `Referer` path, only when it points at this host; otherwise `/dashboard`) with the message as a flash `error`. Other errors go to `error.html`.
+
+User rules in `UserService`:
+
+- Emails are trimmed, lowercased, and unique.
+- A blank password on edit keeps the current one.
+- The last admin cannot change role.
+- A user who appears on any interview cannot change role, so past interviews keep consistent roles.
 
 ## Left for later
 

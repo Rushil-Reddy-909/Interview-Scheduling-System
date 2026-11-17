@@ -1,8 +1,10 @@
-package com.interviewscheduling.web;
+package com.interviewscheduling.web.controller;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
+
+import com.interviewscheduling.web.advice.CurrentAccountAdvice;
 
 @Controller
 public class DashboardController {

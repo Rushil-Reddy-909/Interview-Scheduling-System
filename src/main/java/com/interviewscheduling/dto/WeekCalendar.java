@@ -1,4 +1,4 @@
-package com.interviewscheduling.web.preview;
+package com.interviewscheduling.dto;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -21,7 +21,7 @@ public record WeekCalendar(LocalDate weekStart, List<LocalTime> times, List<Day>
 	public record Day(LocalDate date, List<Cell> cells, int interviewCount, int freeMinutes, boolean today) {
 	}
 
-	public record Cell(LocalTime time, PreviewInterview interview, boolean first, int span) {
+	public record Cell(LocalTime time, InterviewView interview, boolean first, int span) {
 
 		public boolean free() {
 			return interview == null;
